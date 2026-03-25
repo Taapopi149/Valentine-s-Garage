@@ -1,4 +1,4 @@
-package com.example.valentinesgarage.ui.theme.Login
+package com.example.valentinesgarage.Login
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box

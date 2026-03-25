@@ -4,7 +4,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import com.example.valentinesgarage.ui.theme.Login.Login
+import com.example.valentinesgarage.Login.Login
 
 
 class MainActivity : ComponentActivity() {

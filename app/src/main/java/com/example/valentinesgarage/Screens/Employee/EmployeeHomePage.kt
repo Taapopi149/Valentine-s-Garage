@@ -53,14 +53,14 @@ fun EmployeeHomePage(navController: NavController) {
                     imageRs = R.drawable.activetruckimg,
                     title = "Trucks in Garage",
                     modifier = Modifier.weight(1f),
-                    onClick = { /*Navigation*/ }
+                    onClick = { navController.navigate("ActiveVehicle") }
                 )
 
                 CardDesign(
                     imageRs = R.drawable.taskspic,
                     title = "Tasks",
                     modifier = Modifier.weight(1f),
-                    onClick = { /*Navigation*/ }
+                    onClick = { navController.navigate("MechanicTaskList") }
                 )
             }
 
@@ -68,7 +68,7 @@ fun EmployeeHomePage(navController: NavController) {
 
             // Full-width Check In button anchored at the bottom
             Button(
-                onClick = { /*Navigation*/ },
+                onClick = { navController.navigate("TruckCheckIn") },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(52.dp),

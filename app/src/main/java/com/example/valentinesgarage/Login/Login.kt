@@ -1,5 +1,6 @@
 package com.example.valentinesgarage.Login
 
+import android.view.View
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -9,6 +10,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -22,14 +24,26 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.lifecycle.ViewModel
+import androidx.navigation.NavController
 
 
+
+//---------------------------------- Login ViewModel
+class LoginViewModel: ViewModel() {
+
+}
+
+// ------------------------------- Login Screen
 @Composable
-fun Login() {
+fun Login(navController: NavController, viewModel: LoginViewModel) {
+
     val context = LocalContext.current
     var employeeId by remember { mutableStateOf("") }
     var employeePassWord by remember { mutableStateOf("") }
@@ -77,10 +91,20 @@ fun Login() {
             )
 
             Button(
-                onClick = {/*  */}
+                onClick = {
+                    navController.navigate("EmployeePage")
+                },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFF1A1A1A)
+
+                )
+
             ) {
 
-                Text("Login")
+                Text(text = "Login",
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Medium
+                    )
             }
 
 

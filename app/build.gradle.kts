@@ -1,20 +1,18 @@
 plugins {
-    alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.compose)
+    id("com.android.application")
+    id("org.jetbrains.kotlin.android")
+    id("org.jetbrains.kotlin.plugin.compose")
+    id("com.google.devtools.ksp")
 }
 
 android {
     namespace = "com.example.valentinesgarage"
-    compileSdk {
-        version = release(36) {
-            minorApiLevel = 1
-        }
-    }
+    compileSdk =34
 
     defaultConfig {
         applicationId = "com.example.valentinesgarage"
         minSdk = 26
-        targetSdk = 36
+        targetSdk = 34
         versionCode = 1
         versionName = "1.0"
 
@@ -34,34 +32,50 @@ android {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
+
+    kotlin {
+        jvmToolchain(11)
+    }
+
     buildFeatures {
         compose = true
     }
 }
 
 dependencies {
-    //Room
-    val room_version = "2.8.4"
-    implementation("androidx.room:room-runtime:${room_version}")
 
+    // -------------------- ROOM --------------------
+    val room_version = "2.6.1"
+    implementation("androidx.room:room-runtime:$room_version")
+    implementation("androidx.room:room-ktx:$room_version")
+    ksp("androidx.room:room-compiler:$room_version")
+
+    // -------------------- COMPOSE --------------------
+    implementation("androidx.compose.ui:ui:1.5.4")
+    implementation("androidx.compose.ui:ui-graphics:1.5.4")
+    implementation("androidx.compose.ui:ui-tooling-preview:1.5.4")
     implementation("androidx.compose.material3:material3:1.2.0")
-    implementation("androidx.compose.material:material-icons-extended:1.5.0")
+
+    // -------------------- NAVIGATION --------------------
+    implementation("androidx.navigation:navigation-compose:2.7.7")
+
+    // -------------------- CORE --------------------
+    implementation("androidx.core:core-ktx:1.12.0")
+    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.6.2")
+    implementation("androidx.activity:activity-compose:1.8.2")
+
+    // -------------------- UI EXTRAS --------------------
+    implementation("androidx.compose.material:material-icons-extended:1.5.4")
     implementation("io.coil-kt:coil-compose:2.4.0")
-    implementation(libs.androidx.core.ktx)
-    implementation(libs.androidx.lifecycle.runtime.ktx)
-    implementation(libs.androidx.activity.compose)
-    implementation(platform(libs.androidx.compose.bom))
-    implementation(libs.androidx.compose.ui)
-    implementation(libs.androidx.compose.ui.graphics)
-    implementation(libs.androidx.compose.ui.tooling.preview)
-    implementation(libs.androidx.compose.material3)
-    implementation(libs.androidx.navigation.runtime.ktx)
-    implementation(libs.androidx.navigation.compose)
-    testImplementation(libs.junit)
-    androidTestImplementation(libs.androidx.junit)
-    androidTestImplementation(libs.androidx.espresso.core)
-    androidTestImplementation(platform(libs.androidx.compose.bom))
-    androidTestImplementation(libs.androidx.compose.ui.test.junit4)
-    debugImplementation(libs.androidx.compose.ui.tooling)
-    debugImplementation(libs.androidx.compose.ui.test.manifest)
+
+    // -------------------- TEST --------------------
+    testImplementation("junit:junit:4.13.2")
+
+    androidTestImplementation("androidx.test.ext:junit:1.1.5")
+    androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")
+
+    androidTestImplementation("androidx.compose.ui:ui-test-junit4:1.5.4")
+
+    debugImplementation("androidx.compose.ui:ui-tooling:1.5.4")
+    debugImplementation("androidx.compose.ui:ui-test-manifest:1.5.4")
 }

@@ -1,17 +1,18 @@
 package com.example.valentinesgarage.AppNavigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.example.valentinesgarage.Data.DAO.UserDao
 import com.example.valentinesgarage.Login.Login
 import com.example.valentinesgarage.Login.LoginViewModel
 import com.example.valentinesgarage.Login.SignUp
-import com.example.valentinesgarage.Login.SignUpViewModel
 import com.example.valentinesgarage.Screens.CheckIn.CheckInViewModel
-import com.example.valentinesgarage.Screens.CheckIn.TruckCheckInForm
 import com.example.valentinesgarage.Screens.CheckIn.TruckCheckInScreen
 import com.example.valentinesgarage.Screens.Employee.EmployeeHomePage
 import com.example.valentinesgarage.Screens.Employee.EmployeeProfilePage
@@ -25,12 +26,22 @@ import com.example.valentinesgarage.Screens.Vehicles.TruckDetailScreen
 
 
 @Composable
-fun AppNavigation(mechanicViewModel: MechanicViewModel, activeVehiclesViewModel: ActiveVehiclesViewModel, loginViewModel: LoginViewModel, checkInViewModel: CheckInViewModel, signUpViewModel: SignUpViewModel) {
+fun AppNavigation(mechanicViewModel: MechanicViewModel,
+                  activeVehiclesViewModel: ActiveVehiclesViewModel,
+                  loginViewModel: LoginViewModel,
+                  checkInViewModel: CheckInViewModel,
+                  userDao: UserDao) {
 
     val navController = rememberNavController()
 
+
+
     NavHost(navController = navController, startDestination = "SignUp") {
-        composable ("SignUp"){ SignUp(navController, signUpViewModel) }
+
+        composable("SignUp") {
+            SignUp(navController, userDao)
+        }
+
         composable("Login") { Login(navController, loginViewModel) }
         composable("EmployeePage") { EmployeeHomePage(navController) }
         composable ("MechanicTaskList"){ MechanicVehiclePickerScreen(navController, mechanicViewModel) }

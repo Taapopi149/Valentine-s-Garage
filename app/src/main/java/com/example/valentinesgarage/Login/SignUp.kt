@@ -19,39 +19,76 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
+import com.example.valentinesgarage.Data.DAO.UserDao
+import com.example.valentinesgarage.Data.Database.AppDatabase
 import com.example.valentinesgarage.PassWordHashing.PasswordUtils
-
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 
 // ─── ViewModel ────────────────────────────────────────────────────────────────────────
-class SignUpViewModel : ViewModel() {
+class SignUpViewModel(private val userDao: UserDao) : ViewModel() {
 
-    // TODO: hook up to Firebase / your auth backend
+    fun signUpManager(
+        employeeId: String,
+        firstName: String,
+        lastName: String,
+        email: String?,
+        phone: String?,
+        password: String,
+        onSuccess: () -> Unit,
+        onError: (String) -> Unit
+    ) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val hashedPassword = PasswordUtils.hashPassword(password)
+                val managerUser = com.example.valentinesgarage.Data.Entities.User(
+                    employeeId = employeeId,
+                    firstName = firstName,
+                    lastName = lastName,
+                    role = "manager", // hardcoded role
+                    email = email,
+                    shift = null,     // ignored for manager
+                    phone = phone,
+                    joinDate = null,
+                    taskCompleted = null,
+                    tasksPending = null,
+                    taskProgress = null,
+                    password = hashedPassword
+                )
+
+                userDao.insertUser(managerUser)
+                onSuccess()
+            } catch (e: Exception) {
+                onError(e.message ?: "Failed to create manager account")
+            }
+        }
+    }
 }
 
 // ─── Sign Up Screen ───────────────────────────────────────────────────────────────────
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SignUp(navController: NavController, viewModel: SignUpViewModel = SignUpViewModel()) {
+fun SignUp(navController: NavController, userDao: UserDao) {
+    // Use ViewModel with Factory
+    val viewModel: SignUpViewModel = viewModel(
+        factory = SignUpViewModelFactory(userDao)
+    )
 
     // Form state
-    var firstName  by remember { mutableStateOf("") }
-    var lastName  by remember { mutableStateOf("") }
+    var firstName by remember { mutableStateOf("") }
+    var lastName by remember { mutableStateOf("") }
     var employeeId by remember { mutableStateOf(generateEmployeeId()) }
     var email by remember { mutableStateOf("") }
     var phone by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
-    var accessCode by remember { mutableStateOf("") }
-
-    // Validation / UI state
     var passwordMismatch by remember { mutableStateOf(false) }
 
-
-
-    // ── Main content ──────────────────────────────────────────────────────────────
     Scaffold(
         topBar = {
             TopAppBar(
@@ -66,7 +103,6 @@ fun SignUp(navController: NavController, viewModel: SignUpViewModel = SignUpView
         },
         containerColor = Color.White
     ) { padding ->
-
         Column(
             modifier = Modifier
                 .padding(padding)
@@ -77,7 +113,7 @@ fun SignUp(navController: NavController, viewModel: SignUpViewModel = SignUpView
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
 
-            // ── Header ──────────────────────────────────────────────────────────
+            // Header
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(6.dp)
@@ -98,7 +134,6 @@ fun SignUp(navController: NavController, viewModel: SignUpViewModel = SignUpView
 
             Spacer(modifier = Modifier.height(2.dp))
 
-            // ── Form fields (only enabled after access code verified) ────────────
             val fieldColors = OutlinedTextFieldDefaults.colors(
                 focusedBorderColor = Color.Black,
                 focusedLabelColor = Color.Black
@@ -203,16 +238,23 @@ fun SignUp(navController: NavController, viewModel: SignUpViewModel = SignUpView
                         passwordMismatch = true
                         return@Button
                     }
-                    // TODO: call viewModel.signUp(...) then navigate
-                    // pass Password to Hash.kt
-                    val hashPassword = PasswordUtils.hashPassword(password)
 
-
-
-
-                    navController.navigate("ManagerHome") {
-                        popUpTo("SignUp") { inclusive = true }
-                    }
+                    viewModel.signUpManager(
+                        employeeId = employeeId,
+                        firstName = firstName,
+                        lastName = lastName,
+                        email = email,
+                        phone = phone,
+                        password = password,
+                        onSuccess = {
+                            navController.navigate("ManagerHome") {
+                                popUpTo("SignUp") { inclusive = true }
+                            }
+                        },
+                        onError = { message ->
+                            println("Error: $message")
+                        }
+                    )
                 },
                 modifier = Modifier
                     .fillMaxWidth()
@@ -227,7 +269,6 @@ fun SignUp(navController: NavController, viewModel: SignUpViewModel = SignUpView
                 )
             }
 
-            // ── Back to login ────────────────────────────────────────────────────
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.Center,
@@ -261,8 +302,12 @@ fun generateEmployeeId(lastNumber: Int = 0): String {
     return "MG00$nextNumber"
 }
 
-@Preview(showBackground = true)
-@Composable
-fun SignUpPreview() {
-    SignUp(navController = rememberNavController())
-}
+//@Preview(showBackground = true)
+//@Composable
+//fun SignUpPreview() {
+//    // Pass a mock UserDao if needed
+//    val fakeUserDao = object : UserDao {
+//        override suspend fun insertUser(user: com.example.valentinesgarage.Data.Entities.User) {}
+//    }
+//    SignUp(navController = rememberNavController(), userDao = fakeUserDao)
+//}

@@ -3,9 +3,9 @@ package com.example.valentinesgarage.Data.Entities
 import androidx.room.*
 import android.net.Uri
 
-@Entity(tableName = "Users")
+@Entity(tableName = "users")
 data class  User (
-    @PrimaryKey val EmployeeId: String,
+    @PrimaryKey val employeeId: String,
     @ColumnInfo(name = "first_name") val firstName: String,
     @ColumnInfo(name = "last_name") val lastName: String,
     @ColumnInfo(name = "role") val role: String,

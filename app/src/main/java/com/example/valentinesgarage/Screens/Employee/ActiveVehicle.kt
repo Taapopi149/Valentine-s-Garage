@@ -130,7 +130,7 @@ fun ActiveVehiclesScreen(
                             truck = truck,
                             onClick = {
                                 // Navigates to the detail screen, passing the truck id
-                                navController.navigate("taskBoard/${truck.id}")
+                                navController.navigate( "truckDetail/${truck.id}")
                             }
                         )
                     }

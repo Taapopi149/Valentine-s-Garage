@@ -1,4 +1,7 @@
 package com.example.valentinesgarage.Screens.Manager
 
-class ManagerHomePage {
-}
+import androidx.compose.runtime.Composable
+import androidx.navigation.NavController
+
+@Composable
+fun ManagerHome(navController: NavController) {}

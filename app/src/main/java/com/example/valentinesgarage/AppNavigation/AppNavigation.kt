@@ -1,8 +1,6 @@
 package com.example.valentinesgarage.AppNavigation
 
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.platform.LocalContext
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -12,11 +10,12 @@ import com.example.valentinesgarage.Data.DAO.UserDao
 import com.example.valentinesgarage.Login.Login
 import com.example.valentinesgarage.Login.LoginViewModel
 import com.example.valentinesgarage.Login.SignUp
+import com.example.valentinesgarage.Manager.ManagerDashboardScreen
 import com.example.valentinesgarage.Screens.CheckIn.CheckInViewModel
 import com.example.valentinesgarage.Screens.CheckIn.TruckCheckInScreen
 import com.example.valentinesgarage.Screens.Employee.EmployeeHomePage
 import com.example.valentinesgarage.Screens.Employee.EmployeeProfilePage
-import com.example.valentinesgarage.Screens.Manager.ManagerHome
+import com.example.valentinesgarage.Screens.Manager.AddEmployeeScreen
 import com.example.valentinesgarage.Screens.Mechanic.MechanicTaskBoardScreen
 import com.example.valentinesgarage.Screens.Mechanic.MechanicVehiclePickerScreen
 import com.example.valentinesgarage.Screens.Mechanic.MechanicViewModel
@@ -28,7 +27,6 @@ import com.example.valentinesgarage.Screens.Vehicles.TruckDetailScreen
 @Composable
 fun AppNavigation(mechanicViewModel: MechanicViewModel,
                   activeVehiclesViewModel: ActiveVehiclesViewModel,
-                  loginViewModel: LoginViewModel,
                   checkInViewModel: CheckInViewModel,
                   userDao: UserDao) {
 
@@ -42,12 +40,15 @@ fun AppNavigation(mechanicViewModel: MechanicViewModel,
             SignUp(navController, userDao)
         }
 
-        composable("Login") { Login(navController, loginViewModel) }
+        composable("Login") { Login(navController, userDao) }
         composable("EmployeePage") { EmployeeHomePage(navController) }
         composable ("MechanicTaskList"){ MechanicVehiclePickerScreen(navController, mechanicViewModel) }
         composable ("ActiveVehicle"){ ActiveVehiclesScreen(navController, activeVehiclesViewModel) }
         composable ("TruckCheckIn"){ TruckCheckInScreen(navController,checkInViewModel ) }
-        composable ("ManagerHome"){ ManagerHome(navController) }
+        composable ("ManagerHome"){ManagerDashboardScreen(navController) }
+
+        composable("addEmployee"){AddEmployeeScreen(navController)}
+
         composable(
             route = "taskBoard/{jobId}"
         ) { backStackEntry ->

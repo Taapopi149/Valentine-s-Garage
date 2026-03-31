@@ -16,78 +16,122 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
-import androidx.navigation.compose.rememberNavController
 import com.example.valentinesgarage.Data.DAO.UserDao
-import com.example.valentinesgarage.Data.Database.AppDatabase
 import com.example.valentinesgarage.PassWordHashing.PasswordUtils
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
-// ─── ViewModel ────────────────────────────────────────────────────────────────────────
+// ─── ViewModel ────────────────────────────────────────────────────────────────
+
 class SignUpViewModel(private val userDao: UserDao) : ViewModel() {
 
+    // UI observes this  starts empty, fills once DB lookup completes
+    var generatedEmployeeId by mutableStateOf("")
+        private set
+
+    init {
+        viewModelScope.launch(Dispatchers.IO) {
+            val lastId = userDao.getLastEmployeeId()   // e.g. "MG003" or null
+            val nextId = buildNextEmployeeId(lastId)
+            withContext(Dispatchers.Main) {
+                generatedEmployeeId = nextId
+            }
+        }
+    }
+
+    // ─── ID Generation ────────────────────────────────────────────────────────
+    private fun buildNextEmployeeId(lastId: String?): String {
+        if (lastId == null) return "MG001"             // very first manager
+        return try {
+            val number = lastId.removePrefix("MG").toInt()
+            "MG${(number + 1).toString().padStart(3, '0')}"  // MG001 → MG002 … MG099 → MG100
+        } catch (e: NumberFormatException) {
+            "MG001"                                    // fallback if DB value is malformed
+        }
+    }
+
+    // ─── Sign Up ──────────────────────────────────────────────────────────────
     fun signUpManager(
         employeeId: String,
-        firstName: String,
-        lastName: String,
-        email: String?,
-        phone: String?,
-        password: String,
-        onSuccess: () -> Unit,
-        onError: (String) -> Unit
+        firstName:  String,
+        lastName:   String,
+        email:      String?,
+        phone:      String?,
+        password:   String,
+        onSuccess:  () -> Unit,
+        onError:    (String) -> Unit
     ) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 val hashedPassword = PasswordUtils.hashPassword(password)
                 val managerUser = com.example.valentinesgarage.Data.Entities.User(
-                    employeeId = employeeId,
-                    firstName = firstName,
-                    lastName = lastName,
-                    role = "manager", // hardcoded role
-                    email = email,
-                    shift = null,     // ignored for manager
-                    phone = phone,
-                    joinDate = null,
+                    employeeId    = employeeId,
+                    firstName     = firstName,
+                    lastName      = lastName,
+                    role          = "manager",
+                    email         = email,
+                    shift         = null,
+                    phone         = phone,
+                    joinDate      = null,
                     taskCompleted = null,
-                    tasksPending = null,
-                    taskProgress = null,
-                    password = hashedPassword
+                    tasksPending  = null,
+                    taskProgress  = null,
+                    password      = hashedPassword
                 )
-
                 userDao.insertUser(managerUser)
-                onSuccess()
+                withContext(Dispatchers.Main) { onSuccess() }
             } catch (e: Exception) {
-                onError(e.message ?: "Failed to create manager account")
+                withContext(Dispatchers.Main) {
+                    onError(e.message ?: "Failed to create manager account")
+                }
             }
         }
     }
 }
 
-// ─── Sign Up Screen ───────────────────────────────────────────────────────────────────
+// ─── Sign Up Screen ───────────────────────────────────────────────────────────
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SignUp(navController: NavController, userDao: UserDao) {
-    // Use ViewModel with Factory
+
     val viewModel: SignUpViewModel = viewModel(
         factory = SignUpViewModelFactory(userDao)
     )
 
     // Form state
-    var firstName by remember { mutableStateOf("") }
-    var lastName by remember { mutableStateOf("") }
-    var employeeId by remember { mutableStateOf(generateEmployeeId()) }
-    var email by remember { mutableStateOf("") }
-    var phone by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
+    var firstName       by remember { mutableStateOf("") }
+    var lastName        by remember { mutableStateOf("") }
+    var employeeId      by remember { mutableStateOf("Generating…") }
+    var email           by remember { mutableStateOf("") }
+    var phone           by remember { mutableStateOf("") }
+    var password        by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
     var passwordMismatch by remember { mutableStateOf(false) }
+
+    // Once the ViewModel finishes the DB lookup, sync the ID into local state
+    LaunchedEffect(viewModel.generatedEmployeeId) {
+        if (viewModel.generatedEmployeeId.isNotEmpty()) {
+            employeeId = viewModel.generatedEmployeeId
+        }
+    }
+
+    val isFormValid = firstName.isNotBlank() &&
+            lastName.isNotBlank() &&
+            employeeId.isNotBlank() &&
+            employeeId != "Generating…" &&   // don't allow submit before ID is ready
+            email.isNotBlank() &&
+            phone.isNotBlank() &&
+            password.isNotBlank() &&
+            confirmPassword.isNotBlank() &&
+            password == confirmPassword
 
     Scaffold(
         topBar = {
@@ -119,15 +163,15 @@ fun SignUp(navController: NavController, userDao: UserDao) {
                 verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 Text(
-                    text = "Create Employee Account",
-                    style = MaterialTheme.typography.headlineMedium,
+                    text       = "Create Employee Account",
+                    style      = MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center
+                    textAlign  = TextAlign.Center
                 )
                 Text(
-                    text = "Fill in the details below to register",
-                    fontSize = 13.sp,
-                    color = Color(0xFF888888),
+                    text      = "Fill in the details below to register",
+                    fontSize  = 13.sp,
+                    color     = Color(0xFF888888),
                     textAlign = TextAlign.Center
                 )
             }
@@ -136,98 +180,109 @@ fun SignUp(navController: NavController, userDao: UserDao) {
 
             val fieldColors = OutlinedTextFieldDefaults.colors(
                 focusedBorderColor = Color.Black,
-                focusedLabelColor = Color.Black
+                focusedLabelColor  = Color.Black
             )
             val fieldShape = RoundedCornerShape(10.dp)
 
             OutlinedTextField(
-                value = firstName,
+                value         = firstName,
                 onValueChange = { firstName = it },
-                label = { Text("First Name") },
-                shape = fieldShape,
-                colors = fieldColors,
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth()
+                label         = { Text("First Name") },
+                shape         = fieldShape,
+                colors        = fieldColors,
+                singleLine    = true,
+                modifier      = Modifier.fillMaxWidth()
             )
 
             OutlinedTextField(
-                value = lastName,
+                value         = lastName,
                 onValueChange = { lastName = it },
-                label = { Text("Last Name") },
-                shape = fieldShape,
-                colors = fieldColors,
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth()
+                label         = { Text("Last Name") },
+                shape         = fieldShape,
+                colors        = fieldColors,
+                singleLine    = true,
+                modifier      = Modifier.fillMaxWidth()
+            )
+
+            // Employee ID — read-only, auto-filled from DB
+            OutlinedTextField(
+                value         = employeeId,
+                onValueChange = {},
+                label         = { Text("Employee ID") },
+                shape         = fieldShape,
+                colors        = fieldColors,
+                singleLine    = true,
+                readOnly      = true,
+                modifier      = Modifier.fillMaxWidth(),
+                // Show a spinner inside the field while the ID is being generated
+                trailingIcon  = {
+                    if (employeeId == "Generating…") {
+                        CircularProgressIndicator(
+                            modifier  = Modifier.size(18.dp),
+                            strokeWidth = 2.dp,
+                            color     = Color.Black
+                        )
+                    }
+                }
             )
 
             OutlinedTextField(
-                value = employeeId,
-                onValueChange = { },
-                label = { Text("Employee ID") },
-                shape = fieldShape,
-                colors = fieldColors,
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-                readOnly = true
-            )
-
-            OutlinedTextField(
-                value = email,
+                value         = email,
                 onValueChange = { email = it },
-                label = { Text("Email Address") },
+                label         = { Text("Email Address") },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-                shape = fieldShape,
-                colors = fieldColors,
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth()
+                shape         = fieldShape,
+                colors        = fieldColors,
+                singleLine    = true,
+                modifier      = Modifier.fillMaxWidth()
             )
 
             OutlinedTextField(
-                value = phone,
-                onValueChange = { phone = it },
-                label = { Text("Phone Number") },
+                value           = phone,
+                onValueChange   = { phone = it },
+                label           = { Text("Phone Number") },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-                shape = fieldShape,
-                colors = fieldColors,
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth()
+                shape           = fieldShape,
+                colors          = fieldColors,
+                singleLine      = true,
+                modifier        = Modifier.fillMaxWidth()
             )
 
             OutlinedTextField(
-                value = password,
+                value         = password,
                 onValueChange = {
                     password = it
                     passwordMismatch = false
                 },
-                label = { Text("Password") },
+                label                = { Text("Password") },
                 visualTransformation = PasswordVisualTransformation(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                shape = fieldShape,
-                colors = fieldColors,
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth()
+                keyboardOptions      = KeyboardOptions(keyboardType = KeyboardType.Password),
+                shape                = fieldShape,
+                colors               = fieldColors,
+                singleLine           = true,
+                modifier             = Modifier.fillMaxWidth()
             )
 
             OutlinedTextField(
-                value = confirmPassword,
+                value         = confirmPassword,
                 onValueChange = {
                     confirmPassword = it
                     passwordMismatch = false
                 },
-                label = { Text("Confirm Password") },
+                label                = { Text("Confirm Password") },
                 visualTransformation = PasswordVisualTransformation(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                isError = passwordMismatch,
-                supportingText = {
+                keyboardOptions      = KeyboardOptions(keyboardType = KeyboardType.Password),
+                isError              = passwordMismatch,
+                supportingText       = {
                     if (passwordMismatch) Text(
                         "Passwords do not match",
                         color = MaterialTheme.colorScheme.error
                     )
                 },
-                shape = fieldShape,
-                colors = fieldColors,
+                shape      = fieldShape,
+                colors     = fieldColors,
                 singleLine = true,
-                modifier = Modifier.fillMaxWidth()
+                modifier   = Modifier.fillMaxWidth()
             )
 
             Spacer(modifier = Modifier.height(4.dp))
@@ -238,56 +293,50 @@ fun SignUp(navController: NavController, userDao: UserDao) {
                         passwordMismatch = true
                         return@Button
                     }
-
                     viewModel.signUpManager(
                         employeeId = employeeId,
-                        firstName = firstName,
-                        lastName = lastName,
-                        email = email,
-                        phone = phone,
-                        password = password,
-                        onSuccess = {
-                            navController.navigate("ManagerHome") {
-                                popUpTo("SignUp") { inclusive = true }
-                            }
-                        },
-                        onError = { message ->
-                            println("Error: $message")
-                        }
+                        firstName  = firstName,
+                        lastName   = lastName,
+                        email      = email,
+                        phone      = phone,
+                        password   = password,
+                        onSuccess  = { navController.navigate("ManagerHome") },
+                        onError    = { message -> println("Error: $message") }
                     )
                 },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(50.dp),
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1A1A1A))
+                shape   = RoundedCornerShape(12.dp),
+                enabled = isFormValid,
+                colors  = ButtonDefaults.buttonColors(containerColor = Color(0xFF1A1A1A))
             ) {
                 Text(
-                    text = "Create Account",
-                    fontSize = 15.sp,
+                    text       = "Create Account",
+                    fontSize   = 15.sp,
                     fontWeight = FontWeight.Medium
                 )
             }
 
             Row(
-                verticalAlignment = Alignment.CenterVertically,
+                verticalAlignment     = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.Center,
-                modifier = Modifier.fillMaxWidth()
+                modifier              = Modifier.fillMaxWidth()
             ) {
                 Text(
-                    text = "Already have an account? ",
+                    text     = "Already have an account? ",
                     fontSize = 13.sp,
-                    color = Color(0xFF888888)
+                    color    = Color(0xFF888888)
                 )
                 TextButton(
-                    onClick = { navController.navigate("Login") },
+                    onClick        = { navController.navigate("Login") },
                     contentPadding = PaddingValues(0.dp)
                 ) {
                     Text(
-                        text = "Log in",
-                        fontSize = 13.sp,
+                        text       = "Log in",
+                        fontSize   = 13.sp,
                         fontWeight = FontWeight.SemiBold,
-                        color = Color(0xFF1A1A1A)
+                        color      = Color(0xFF1A1A1A)
                     )
                 }
             }
@@ -296,18 +345,3 @@ fun SignUp(navController: NavController, userDao: UserDao) {
         }
     }
 }
-
-fun generateEmployeeId(lastNumber: Int = 0): String {
-    val nextNumber = lastNumber + 1
-    return "MG00$nextNumber"
-}
-
-//@Preview(showBackground = true)
-//@Composable
-//fun SignUpPreview() {
-//    // Pass a mock UserDao if needed
-//    val fakeUserDao = object : UserDao {
-//        override suspend fun insertUser(user: com.example.valentinesgarage.Data.Entities.User) {}
-//    }
-//    SignUp(navController = rememberNavController(), userDao = fakeUserDao)
-//}

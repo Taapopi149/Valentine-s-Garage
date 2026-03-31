@@ -16,6 +16,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -31,18 +32,84 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
-
+import com.example.valentinesgarage.Data.DAO.UserDao
+import com.example.valentinesgarage.Data.Entities.User
+import com.example.valentinesgarage.PassWordHashing.PasswordUtils
+import kotlinx.coroutines.launch
 
 
 //---------------------------------- Login ViewModel
-class LoginViewModel: ViewModel() {
+class LoginViewModel (private val userDao: UserDao): ViewModel() {
+var loginResult by mutableStateOf<User?>(null)
+    private set
+
+var loginError by mutableStateOf<String?> (null)
+    private set
+
+
+    fun login(employeeId: String, password: String) {
+        viewModelScope.launch {
+            val user = userDao.getUserById(employeeId)
+            if (user == null) {
+                loginError = "User not found"
+                loginResult = null
+                return@launch
+            }
+
+            val passwordMatches = PasswordUtils.verifyPassword(password, user.password)
+            if (passwordMatches) {
+                loginResult = user
+                loginError = null
+            } else {
+                loginResult = null
+                loginError = "Incorrect password"
+            }
+        }
+    }
 
 }
 
 // ------------------------------- Login Screen
 @Composable
-fun Login(navController: NavController, viewModel: LoginViewModel) {
+fun Login(navController: NavController, userDao: UserDao) {
+
+    val viewModel: LoginViewModel = viewModel(
+      factory = LoginViewModelFactory(userDao)
+    )
+
+    val user = viewModel.loginResult
+
+    // Routing based on Role
+    LaunchedEffect(user) {
+        if (user != null) {
+            when (user.role) {
+                "manager" -> {
+                    navController.navigate("ManagerHome") {
+                        popUpTo("login") { inclusive = true }
+                    }
+                }
+
+                "mechanic" -> {
+                    navController.navigate("EmployeePage") {
+                        popUpTo("login") { inclusive = true }
+                    }
+                }
+
+                "employee" -> {
+                    navController.navigate("EmployeePage") {
+                        popUpTo("login") { inclusive = true }
+                    }
+                }
+
+                else -> {
+                    navController.navigate("EmployeePage")
+                }
+            }
+        }
+    }
 
     val context = LocalContext.current
     var employeeId by remember { mutableStateOf("") }
@@ -92,7 +159,7 @@ fun Login(navController: NavController, viewModel: LoginViewModel) {
 
             Button(
                 onClick = {
-                    navController.navigate("EmployeePage")
+                    viewModel.login(employeeId, employeePassWord)
                 },
                 colors = ButtonDefaults.buttonColors(
                     containerColor = Color(0xFF1A1A1A)
@@ -105,6 +172,16 @@ fun Login(navController: NavController, viewModel: LoginViewModel) {
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Medium
                     )
+            }
+
+            LaunchedEffect(viewModel.loginResult) {
+                viewModel.loginResult?.let {
+                    user -> when(user.role) {
+                        "manager" -> navController.navigate("ManagerHome")
+                        "mechanic" -> navController.navigate("EmployeePage")
+                    else -> println("Unknown Role")
+                    }
+                }
             }
 
 

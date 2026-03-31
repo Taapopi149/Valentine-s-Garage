@@ -83,7 +83,8 @@ class SignUpViewModel(private val userDao: UserDao) : ViewModel() {
                     taskCompleted = null,
                     tasksPending  = null,
                     taskProgress  = null,
-                    password      = hashedPassword
+                    password      = hashedPassword,
+                    department = null
                 )
                 userDao.insertUser(managerUser)
                 withContext(Dispatchers.Main) { onSuccess() }

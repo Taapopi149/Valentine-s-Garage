@@ -31,7 +31,7 @@ import com.example.valentinesgarage.Screens.Manager.ViewFactory.AddEmployeeViewM
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlin.random.Random
+import java.time.LocalDate
 
 // ─── Helper Functions ──────────────────────────────────────────────────────────
 
@@ -80,7 +80,7 @@ fun generatePassword(): String {
 
 //-------------------- ViewModel --------------------------------------------------
 
-class AddEmpoyeeViewModel(private val userDao: UserDao) : ViewModel() {
+class AddEmployeeViewModel(private val userDao: UserDao) : ViewModel() {
 
 
     var generatedEmployeeId by mutableStateOf("")
@@ -96,6 +96,41 @@ class AddEmpoyeeViewModel(private val userDao: UserDao) : ViewModel() {
         }
     }
 
+    fun addEmployee(
+        employeeId:String,
+        firstName:String,
+        lastName:String,
+        role: String,
+        shift: String,
+        email: String?,
+        phone: String?,
+        password: String,
+        department: String,
+        onSuccess: () -> Unit,
+        onError: (String) -> Unit
+    ) {
+        viewModelScope.launch (Dispatchers.IO) {
+            val joinDateString: String = LocalDate.now().toString()
+            val employeeUser = com.example.valentinesgarage.Data.Entities.User(
+                employeeId    = employeeId,
+                firstName     = firstName,
+                lastName      = lastName,
+                role          = role,
+                email         = email,
+                shift         = shift,
+                phone         = phone,
+                joinDate      = joinDateString,
+                taskCompleted = null,
+                tasksPending  = null,
+                taskProgress  = null,
+                password      = password,
+                department = department
+            )
+            userDao.insertUser(employeeUser)
+            withContext(Dispatchers.Main) {onSuccess()}
+        }
+    }
+
 
 }
 
@@ -107,19 +142,20 @@ class AddEmpoyeeViewModel(private val userDao: UserDao) : ViewModel() {
 @Composable
 fun AddEmployeeScreen(navController: NavController, userDao: UserDao) {
 
-    val viewModel: AddEmpoyeeViewModel = viewModel(
+    val viewModel: AddEmployeeViewModel = viewModel(
         factory = AddEmployeeViewModelFactory(userDao)
     )
 
     val clipboardManager = LocalClipboardManager.current
 
     // Form state
-    var fullName   by remember { mutableStateOf("") }
+    var first_Name   by remember { mutableStateOf("") }
+    var last_Name   by remember { mutableStateOf("") }
     var email      by remember { mutableStateOf("") }
     var phone      by remember { mutableStateOf("") }
     var role       by remember { mutableStateOf("") }
     var department by remember { mutableStateOf("") }
-    var salary     by remember { mutableStateOf("") }
+     var shift     by remember { mutableStateOf("") }
 
 
 
@@ -158,7 +194,7 @@ fun AddEmployeeScreen(navController: NavController, userDao: UserDao) {
             title = { Text("Employee Added!") },
             text  = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("$fullName has been successfully added.")
+                    Text("${first_Name} ${last_Name}  has been successfully added.")
                     HorizontalDivider()
                     CredentialRow(label = "Employee ID", value = employeeId)
                     CredentialRow(label = "Password",    value = generatedPassword)
@@ -215,15 +251,26 @@ fun AddEmployeeScreen(navController: NavController, userDao: UserDao) {
             SectionHeader(title = "Personal Information", icon = Icons.Default.Person)
 
             FormField(
-                value         = fullName,
-                onValueChange = { fullName = it; nameError = false },
-                label         = "Full Name *",
-                placeholder   = "e.g. Alice Johnson",
+                value         = first_Name,
+                onValueChange = { first_Name = it; nameError = false },
+                label         = "First Name *",
+                placeholder   = "e.g. Alice",
                 isError       = nameError,
                 errorMessage  = "Full name is required",
                 leadingIcon   = Icons.Default.Person,
                 keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words)
             )
+            FormField(
+                value         = last_Name,
+                onValueChange = { last_Name = it; nameError = false },
+                label         = "Last Name *",
+                placeholder   = "e.g. Johnson",
+                isError       = nameError,
+                errorMessage  = "Full name is required",
+                leadingIcon   = Icons.Default.Person,
+                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words)
+            )
+
 
             FormField(
                 value         = email,
@@ -300,12 +347,12 @@ fun AddEmployeeScreen(navController: NavController, userDao: UserDao) {
             }
 
             FormField(
-                value           = salary,
-                onValueChange   = { salary = it },
-                label           = "Salary (optional)",
-                placeholder     = "e.g. 15000",
+                value           = shift,
+                onValueChange   = { shift = it },
+                label           = "shift",
+                placeholder     = "Night, Day",
                 leadingIcon     = Icons.Default.List,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words)
             )
 
             HorizontalDivider()
@@ -459,13 +506,31 @@ fun AddEmployeeScreen(navController: NavController, userDao: UserDao) {
             Button(
                 onClick = {
                     // Validate
-                    nameError  = fullName.isBlank()
+                    nameError  = first_Name.isBlank()
+                    nameError = last_Name.isBlank()
                     emailError = email.isBlank() || !email.contains("@")
                     roleError  = role.isBlank()
 
                     if (!nameError && !emailError && !roleError) {
-                        showSuccess = true
+                        viewModel.addEmployee(
+                            employeeId,
+                            first_Name,
+                            last_Name,
+                            role,
+                            shift,
+                            email,
+                            phone,
+                            generatedPassword,
+                            department,
+                            onSuccess = {
+                                showSuccess = true
+                            },
+                            onError = {
+                                println("Error adding employee: \$errorMsg")
+                            }
+                        )
                     }
+
                 },
                 modifier = Modifier.fillMaxWidth(),
                 shape    = RoundedCornerShape(12.dp),

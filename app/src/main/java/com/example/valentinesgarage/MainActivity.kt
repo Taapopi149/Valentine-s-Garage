@@ -7,7 +7,6 @@ import androidx.activity.enableEdgeToEdge
 import androidx.lifecycle.ViewModelProvider
 import com.example.valentinesgarage.AppNavigation.AppNavigation
 import com.example.valentinesgarage.Data.Database.AppDatabase
-import com.example.valentinesgarage.Login.LoginViewModel
 import com.example.valentinesgarage.Screens.CheckIn.CheckInViewModel
 import com.example.valentinesgarage.Screens.Mechanic.MechanicViewModel
 import com.example.valentinesgarage.Screens.Vehicles.ActiveVehiclesViewModel

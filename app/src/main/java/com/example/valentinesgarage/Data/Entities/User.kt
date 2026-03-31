@@ -16,6 +16,7 @@ data class  User (
     @ColumnInfo(name = "tasks_completed") val taskCompleted: Int?,
     @ColumnInfo(name = "tasks_pending") val tasksPending: Int?,
     @ColumnInfo(name="task_progress") val taskProgress: Int?,
-    @ColumnInfo(name = "password") val password: String
+    @ColumnInfo(name = "password") val password: String,
+    @ColumnInfo(name = "Department") val department: String?
 
 )

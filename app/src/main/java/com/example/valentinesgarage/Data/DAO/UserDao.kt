@@ -18,6 +18,14 @@ interface UserDao {
     @Query("SELECT employeeId FROM users ORDER BY employeeId DESC LIMIT 1")
     suspend fun getLastEmployeeId(): String?
 
+    @Query("""
+    SELECT employeeId FROM users
+    WHERE employeeId LIKE 'EMP%'
+    ORDER BY CAST(SUBSTR(employeeId, 4) AS INTEGER) DESC
+    LIMIT 1
+""")
+    suspend fun getLastEmployeeIdOnly(): String?
+
     @Query("SELECT * FROM users WHERE employeeId = :employeeId AND password = :password LIMIT 1")
     suspend fun login(employeeId: String, password: String) : User?
 

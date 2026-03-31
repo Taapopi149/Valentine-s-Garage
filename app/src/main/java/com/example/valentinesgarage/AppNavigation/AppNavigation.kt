@@ -47,7 +47,7 @@ fun AppNavigation(mechanicViewModel: MechanicViewModel,
         composable ("TruckCheckIn"){ TruckCheckInScreen(navController,checkInViewModel ) }
         composable ("ManagerHome"){ManagerDashboardScreen(navController) }
 
-        composable("addEmployee"){AddEmployeeScreen(navController)}
+        composable("addEmployee"){AddEmployeeScreen(navController, userDao)}
 
         composable(
             route = "taskBoard/{jobId}"

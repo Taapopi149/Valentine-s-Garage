@@ -22,14 +22,34 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
+import com.example.valentinesgarage.Data.DAO.UserDao
+import com.example.valentinesgarage.Screens.Manager.ViewFactory.AddEmployeeViewModelFactory
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlin.random.Random
 
 // ─── Helper Functions ──────────────────────────────────────────────────────────
 
-fun generateEmployeeId(): String {
-    val number = Random.nextInt(1000, 9999)
-    return "EMP-$number"
+//fun generateEmployeeId(): String {
+//    val number = Random.nextInt(1000, 9999)
+//    return "EMP-$number"
+//}
+
+
+private fun buildNextEmployeeId(lastId: String?): String {
+    if (lastId == null) return "EMP001"
+
+    return try {
+        val number = lastId.removePrefix("EMP").toInt()
+        "EMP${(number + 1).toString().padStart(3, '0')}"
+    } catch (e: Exception) {
+        "EMP001"
+    }
 }
 
 fun generatePassword(): String {
@@ -58,11 +78,38 @@ fun generatePassword(): String {
     return (required + extra).shuffled().joinToString("")
 }
 
+//-------------------- ViewModel --------------------------------------------------
+
+class AddEmpoyeeViewModel(private val userDao: UserDao) : ViewModel() {
+
+
+    var generatedEmployeeId by mutableStateOf("")
+        private set
+
+    init {
+        viewModelScope.launch(Dispatchers.IO) {
+            val lastId = userDao.getLastEmployeeIdOnly()   // e.g. "MG003" or null
+            val nextId = buildNextEmployeeId(lastId)
+            withContext(Dispatchers.Main) {
+                generatedEmployeeId = nextId
+            }
+        }
+    }
+
+
+}
+
+
+
 // ─── Add Employee Screen ───────────────────────────────────────────────────────
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AddEmployeeScreen(navController: NavController) {
+fun AddEmployeeScreen(navController: NavController, userDao: UserDao) {
+
+    val viewModel: AddEmpoyeeViewModel = viewModel(
+        factory = AddEmployeeViewModelFactory(userDao)
+    )
 
     val clipboardManager = LocalClipboardManager.current
 
@@ -74,12 +121,22 @@ fun AddEmployeeScreen(navController: NavController) {
     var department by remember { mutableStateOf("") }
     var salary     by remember { mutableStateOf("") }
 
+
+
     // Generated credentials — created once when the screen opens
-    var employeeId       by remember { mutableStateOf(generateEmployeeId()) }
+    var employeeId       by remember { mutableStateOf("Generating...") }
     var generatedPassword by remember { mutableStateOf(generatePassword()) }
     var passwordVisible  by remember { mutableStateOf(false) }
     var idCopied         by remember { mutableStateOf(false) }
     var pwCopied         by remember { mutableStateOf(false) }
+
+    // Once the ViewModel finishes the DB lookup, sync the ID into local state
+
+    LaunchedEffect(viewModel.generatedEmployeeId) {
+        if (viewModel.generatedEmployeeId.isNotEmpty()) {
+            employeeId = viewModel.generatedEmployeeId
+        }
+    }
 
     // Dropdown state
     var deptExpanded by remember { mutableStateOf(false) }
@@ -268,8 +325,17 @@ fun AddEmployeeScreen(navController: NavController) {
                 trailingIcon  = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         // Regenerate ID button
+
+                        if (employeeId =="Generating..."){
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                strokeWidth = 2.dp,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+
+
                         IconButton(onClick = {
-                            employeeId = generateEmployeeId()
                             idCopied   = false
                         }) {
                             Icon(

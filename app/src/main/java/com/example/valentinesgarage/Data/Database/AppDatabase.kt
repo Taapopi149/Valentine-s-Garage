@@ -10,7 +10,8 @@ import com.example.valentinesgarage.Data.Entities.Tasks
 import com.example.valentinesgarage.Data.Entities.Truck
 import com.example.valentinesgarage.Data.Entities.User
 
-@Database(entities = [User::class, Notes::class, Tasks::class, Truck::class], version = 1, exportSchema = false)
+// Change the version everytime u update the tables adding columns or adding a new Table
+@Database(entities = [User::class, Notes::class, Tasks::class, Truck::class], version = 2, exportSchema = false)
 abstract class AppDatabase: RoomDatabase() {
     abstract fun userDao(): UserDao
 
@@ -24,7 +25,7 @@ abstract class AppDatabase: RoomDatabase() {
                     context.applicationContext,
                     AppDatabase:: class.java,
                     "valentines_garage_db"
-                ).build()
+                ).fallbackToDestructiveMigration().build()
                 INSTANCE = instance
                 instance
             }

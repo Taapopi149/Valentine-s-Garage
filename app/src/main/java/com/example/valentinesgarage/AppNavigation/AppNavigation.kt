@@ -40,7 +40,9 @@ fun AppNavigation(mechanicViewModel: MechanicViewModel,
             SignUp(navController, userDao)
         }
 
-        composable("Login") { Login(navController, userDao) }
+        composable("Login") {
+            Login(navController, userDao) }
+
         composable("EmployeePage") { EmployeeHomePage(navController) }
         composable ("MechanicTaskList"){ MechanicVehiclePickerScreen(navController, mechanicViewModel) }
         composable ("ActiveVehicle"){ ActiveVehiclesScreen(navController, activeVehiclesViewModel) }
@@ -60,6 +62,7 @@ fun AppNavigation(mechanicViewModel: MechanicViewModel,
                 jobId = jobId
             )
         }
+
         composable(
             route = "truckDetail/{truckId}",
             arguments = listOf(

@@ -27,6 +27,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.valentinesgarage.Data.DAO.UserDao
+import com.example.valentinesgarage.PassWordHashing.PasswordUtils
 import com.example.valentinesgarage.Screens.Manager.ViewFactory.AddEmployeeViewModelFactory
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -109,6 +110,10 @@ class AddEmployeeViewModel(private val userDao: UserDao) : ViewModel() {
         onSuccess: () -> Unit,
         onError: (String) -> Unit
     ) {
+
+        val hashedPassword = PasswordUtils.hashPassword(password)
+
+
         viewModelScope.launch (Dispatchers.IO) {
             val joinDateString: String = LocalDate.now().toString()
             val employeeUser = com.example.valentinesgarage.Data.Entities.User(
@@ -123,7 +128,7 @@ class AddEmployeeViewModel(private val userDao: UserDao) : ViewModel() {
                 taskCompleted = null,
                 tasksPending  = null,
                 taskProgress  = null,
-                password      = password,
+                password      = hashedPassword,
                 department = department
             )
             userDao.insertUser(employeeUser)

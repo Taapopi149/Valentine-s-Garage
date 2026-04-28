@@ -87,14 +87,14 @@ fun Login(navController: NavController, userDao: UserDao) {
     // Navigation based on role
     LaunchedEffect(user) {
         if (user != null) {
-            when (user.role) {
+            when (user.role.lowercase()) {
                 "manager" -> {
                     navController.navigate("ManagerHome") {
                         popUpTo("login") { inclusive = true }
                     }
                 }
 
-                "Mechanic", "employee" -> {
+                "mechanic", "employee" -> {
                     navController.navigate("EmployeePage") {
                         popUpTo("login") { inclusive = true }
                     }

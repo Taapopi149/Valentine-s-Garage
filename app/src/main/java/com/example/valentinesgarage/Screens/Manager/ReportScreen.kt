@@ -134,5 +134,5 @@ fun ActivityCard(report: EmployeeActivityReport) {
             )
         }
     }
-}package com.example.valentinesgarage.Screens.Manager
+}
 

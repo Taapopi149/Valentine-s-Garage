@@ -96,7 +96,10 @@ fun ManagerDashboardScreen(navController: NavController) {
         Box(modifier = Modifier.padding(innerPadding)) {
             when (selectedRoute) {
                 GarageNavRoute.Dashboard.route -> DashboardTab(
-                    onAddMechanic = { navController.navigate("addEmployee") } // Navigate to AddEmployee
+
+                    // add routes here
+                    onAddMechanic = { navController.navigate("addEmployee") },
+                    onReportClick = { navController.navigate("reports") }
                 )
                 GarageNavRoute.Mechanics.route -> MechanicsTab(
                     mechanics     = sampleMechanics,
@@ -111,7 +114,7 @@ fun ManagerDashboardScreen(navController: NavController) {
 // ─── Dashboard Tab ────────────────────────────────────────────────────────────
 
 @Composable
-private fun DashboardTab(onAddMechanic: () -> Unit) {
+private fun DashboardTab(onAddMechanic: () -> Unit, onReportClick: () -> Unit) {
 
     LazyColumn(
         modifier            = Modifier.fillMaxSize(),
@@ -137,7 +140,7 @@ private fun DashboardTab(onAddMechanic: () -> Unit) {
                 IconButton(onClick = onAddMechanic) {
                     Icon(
                         imageVector        = Icons.Default.Add,
-                        contentDescription = "Add Mechanic",
+                        contentDescription = "Add Employee",
                         tint               = MaterialTheme.colorScheme.primary
                     )
                 }
@@ -152,7 +155,7 @@ private fun DashboardTab(onAddMechanic: () -> Unit) {
             ) {
                 StatCard(
                     modifier = Modifier.weight(1f),
-                    label    = "Mechanics",
+                    label    = "Employee",
                     value    = "5",
                     icon     = Icons.Default.Person,
                     color    = MaterialTheme.colorScheme.primary
@@ -207,7 +210,7 @@ private fun DashboardTab(onAddMechanic: () -> Unit) {
                     label    = "Reports",
                     icon     = Icons.Default.Info,
                     color    = Color(0xFFF59E0B),
-                    onClick  = {}
+                    onClick  = onReportClick
                 )
             }
         }
@@ -267,7 +270,7 @@ private fun MechanicsTab(
             verticalAlignment     = Alignment.CenterVertically
         ) {
             Text(
-                text       = "All Mechanics",
+                text       = "All Employee",
                 style      = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold
             )
@@ -314,7 +317,7 @@ private fun SearchTab(mechanics: List<Mechanic>) {
     ) {
 
         Text(
-            text       = "Search Mechanics",
+            text       = "Search Employee",
             style      = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold
         )
@@ -366,7 +369,7 @@ private fun SearchTab(mechanics: List<Mechanic>) {
                             )
                             Spacer(Modifier.height(8.dp))
                             Text(
-                                text  = "No mechanics found",
+                                text  = "No Employees found",
                                 style = MaterialTheme.typography.bodyLarge,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )

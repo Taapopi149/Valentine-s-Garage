@@ -13,6 +13,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -20,12 +21,14 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
+import androidx.navigation.compose.rememberNavController
 import com.example.valentinesgarage.Data.DAO.UserDao
 import com.example.valentinesgarage.PassWordHashing.PasswordUtils
 import com.example.valentinesgarage.Screens.Manager.ViewFactory.AddEmployeeViewModelFactory
@@ -181,7 +184,11 @@ fun AddEmployeeScreen(navController: NavController, userDao: UserDao) {
 
     // Dropdown state
     var deptExpanded by remember { mutableStateOf(false) }
-    val departments  = listOf("Engineering", "Design", "Product", "Analytics", "Marketing", "HR")
+    val departments  = listOf("Engineering", "HR")
+
+    // Role
+    val roleDrop = listOf("receptionist ", "mechanic")
+    var roleExpanded by remember { mutableStateOf(false) }
 
     // Validation errors
     var nameError  by remember { mutableStateOf(false) }
@@ -302,16 +309,47 @@ fun AddEmployeeScreen(navController: NavController, userDao: UserDao) {
             // ── Section: Job Details ────────────────────────────────────────
             SectionHeader(title = "Job Details", icon = Icons.Default.Work)
 
-            FormField(
-                value         = role,
-                onValueChange = { role = it; roleError = false },
-                label         = "Job Role / Title *",
-                placeholder   = "e.g. Senior Developer",
-                isError       = roleError,
-                errorMessage  = "Role is required",
-                leadingIcon   = Icons.Default.Star,
-                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words)
-            )
+
+
+            // Role DropDown
+            ExposedDropdownMenuBox(
+                expanded = roleExpanded,
+                onExpandedChange = {roleExpanded = it}
+            ) {
+               OutlinedTextField(
+                   value         = role,
+                   onValueChange = {},
+                   readOnly      = true,
+                   label         = { Text("Role") },
+                   placeholder   = { Text("Select Role") },
+                   leadingIcon   = {
+                       Icon(Icons.Default.Star, contentDescription = null)
+                   },
+                   trailingIcon  = {
+                       ExposedDropdownMenuDefaults.TrailingIcon(expanded = deptExpanded)
+                   },
+                   modifier      = Modifier
+                       .fillMaxWidth()
+                       .menuAnchor(),
+                   shape         = RoundedCornerShape(12.dp)
+               )
+                ExposedDropdownMenu(
+                    expanded         = roleExpanded,
+                    onDismissRequest = { roleExpanded = false }
+                ) {
+                    roleDrop.forEach { roles ->
+                        DropdownMenuItem(
+                            text    = { Text(roles) },
+                            onClick = {
+                                role   = roles
+                                roleExpanded = false
+                            }
+                        )
+                    }
+                }
+            }
+
+
 
             // Department Dropdown
             ExposedDropdownMenuBox(
@@ -647,3 +685,8 @@ private fun FormField(
         }
     }
 }
+
+
+// Preview
+
+

@@ -100,6 +100,12 @@ fun Login(navController: NavController, userDao: UserDao) {
                     }
                 }
 
+                "receptionist", ->{
+                    navController.navigate("RepHomePage") {
+                        popUpTo("login") {inclusive = true}
+                    }
+                }
+
                 else -> {
                     navController.navigate("EmployeePage")
                 }

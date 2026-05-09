@@ -16,6 +16,7 @@ import com.example.valentinesgarage.Screens.CheckIn.TruckCheckInScreen
 import com.example.valentinesgarage.Screens.Employee.EmployeeHomePage
 import com.example.valentinesgarage.Screens.Employee.EmployeeProfilePage
 import com.example.valentinesgarage.Screens.Manager.AddEmployeeScreen
+// import com.example.valentinesgarage.Screens.Manager.ReportsScreen
 import com.example.valentinesgarage.Screens.Mechanic.MechanicTaskBoardScreen
 import com.example.valentinesgarage.Screens.Mechanic.MechanicVehiclePickerScreen
 import com.example.valentinesgarage.Screens.Mechanic.MechanicViewModel
@@ -42,6 +43,8 @@ fun AppNavigation(mechanicViewModel: MechanicViewModel,
 
         composable("Login") {
             Login(navController, userDao) }
+
+       // composable("reports") {ReportsScreen(navController)}
 
         composable("EmployeePage") { EmployeeHomePage(navController) }
         composable ("MechanicTaskList"){ MechanicVehiclePickerScreen(navController, mechanicViewModel) }
@@ -79,7 +82,9 @@ fun AppNavigation(mechanicViewModel: MechanicViewModel,
         }
 
         composable ("Profile"){ EmployeeProfilePage(navController) }
+      //  composable("Report") { ReportsScreen(navController) }
 
     }
+
 
 }

@@ -11,7 +11,7 @@ import com.example.valentinesgarage.Data.Entities.Truck
 import com.example.valentinesgarage.Data.Entities.User
 
 // Change the version everytime u update the tables adding columns or adding a new Table
-@Database(entities = [User::class, Notes::class, Tasks::class, Truck::class], version = 2, exportSchema = false)
+@Database(entities = [User::class, Notes::class, Tasks::class, Truck::class], version = 4, exportSchema = false)
 abstract class AppDatabase: RoomDatabase() {
     abstract fun userDao(): UserDao
 

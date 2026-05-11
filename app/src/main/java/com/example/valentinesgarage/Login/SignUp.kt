@@ -25,6 +25,7 @@ import com.example.valentinesgarage.PassWordHashing.PasswordUtils
 import kotlinx.coroutines.Dispatchers
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.valentinesgarage.SessionManager
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -87,6 +88,10 @@ class SignUpViewModel(private val userDao: UserDao) : ViewModel() {
                     department = null
                 )
                 userDao.insertUser(managerUser)
+
+                //Save User State
+                SessionManager.login(managerUser)
+
                 withContext(Dispatchers.Main) { onSuccess() }
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {

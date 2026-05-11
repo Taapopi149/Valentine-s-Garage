@@ -7,11 +7,15 @@ import com.example.valentinesgarage.Screens.Vehicles.TruckStatus
 
 @Entity(tableName = "Truck")
 data class Truck (
-    @PrimaryKey val licencePlate: String,
+
+    @PrimaryKey(autoGenerate = true) 
+    val truckId: Int = 0,
+
+    val licencePlate: String,
     val DriverName: String,
     val Odmeter: Int,
     val Condition: VehicleCondition,
-    val truckStatus: TruckStatus,
+
 
     //Store Image as String
     val photoUris: String,

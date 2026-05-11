@@ -10,8 +10,8 @@ import androidx.room.PrimaryKey
     foreignKeys = [
         ForeignKey(
             entity  = Truck::class,
-            parentColumns = ["licencePlate"],
-            childColumns = ["truckId"],
+            parentColumns = ["truckId"],
+            childColumns = ["truckIdOwner"],
             onDelete = ForeignKey.CASCADE
         ),
         ForeignKey(
@@ -21,12 +21,12 @@ import androidx.room.PrimaryKey
             onDelete = ForeignKey.CASCADE
         )
     ],
-    indices = [Index("truckId"), Index("employeeIdFk")]
+    indices = [Index("truckIdOwner"), Index("employeeIdFk")]
     )
 data class Tasks (
     @PrimaryKey(autoGenerate = true) val Taskid: Int = 0,
     val description: String,
     val employeeIdFk: String,
-    val truckId: String,
+    val truckIdOwner: Int,
     val status: String
 )

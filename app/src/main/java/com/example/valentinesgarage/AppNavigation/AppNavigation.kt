@@ -6,6 +6,9 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.example.valentinesgarage.Data.DAO.NotesDao
+import com.example.valentinesgarage.Data.DAO.TasksDao
+import com.example.valentinesgarage.Data.DAO.TruckDao
 import com.example.valentinesgarage.Data.DAO.UserDao
 import com.example.valentinesgarage.Login.Login
 import com.example.valentinesgarage.Login.LoginViewModel
@@ -29,7 +32,11 @@ import com.example.valentinesgarage.Screens.Vehicles.TruckDetailScreen
 fun AppNavigation(mechanicViewModel: MechanicViewModel,
                   activeVehiclesViewModel: ActiveVehiclesViewModel,
                   checkInViewModel: CheckInViewModel,
-                  userDao: UserDao) {
+                  userDao: UserDao,
+                  truckDao: TruckDao,
+                  noteDao: NotesDao,
+                  taskDao: TasksDao
+                  ) {
 
     val navController = rememberNavController()
 
@@ -49,7 +56,7 @@ fun AppNavigation(mechanicViewModel: MechanicViewModel,
         composable("EmployeePage") { EmployeeHomePage(navController) }
         composable ("MechanicTaskList"){ MechanicVehiclePickerScreen(navController, mechanicViewModel) }
         composable ("ActiveVehicle"){ ActiveVehiclesScreen(navController, activeVehiclesViewModel) }
-        composable ("TruckCheckIn"){ TruckCheckInScreen(navController,checkInViewModel ) }
+        composable ("TruckCheckIn"){ TruckCheckInScreen(navController,truckDao, noteDao, taskDao, userDao) }
         composable ("ManagerHome"){ManagerDashboardScreen(navController) }
 
         composable("addEmployee"){AddEmployeeScreen(navController, userDao)}

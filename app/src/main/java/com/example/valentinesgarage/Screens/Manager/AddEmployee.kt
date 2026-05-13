@@ -57,31 +57,14 @@ private fun buildNextEmployeeId(lastId: String?): String {
 }
 
 fun generatePassword(): String {
-    val upper   = ('A'..'Z').toList()
-    val lower   = ('a'..'z').toList()
-    val digits  = ('0'..'9').toList()
-    val special = listOf('!', '@', '#', '$', '%', '&')
+    val letters = ('a'..'z')
+    val numbers = ('0'..'9')
+    val allChars = letters + numbers
 
-    // Guarantee at least one of each character type
-    val required = listOf(
-        upper.random(),
-        upper.random(),
-        lower.random(),
-        lower.random(),
-        digits.random(),
-        digits.random(),
-        special.random(),
-        special.random(),
-    )
-
-    // Fill remaining characters from all pools combined
-    val allChars = upper + lower + digits + special
-    val extra    = (1..(12 - required.size)).map { allChars.random() }
-
-    // Shuffle so required chars aren't always at the front
-    return (required + extra).shuffled().joinToString("")
+    return (1..6)
+        .map { allChars.random() }
+        .joinToString("")
 }
-
 //-------------------- ViewModel --------------------------------------------------
 
 class AddEmployeeViewModel(private val userDao: UserDao) : ViewModel() {

@@ -89,6 +89,7 @@ class SignUpViewModel(private val userDao: UserDao) : ViewModel() {
                 )
                 userDao.insertUser(managerUser)
 
+
                 //Save User State
                 SessionManager.login(managerUser)
 

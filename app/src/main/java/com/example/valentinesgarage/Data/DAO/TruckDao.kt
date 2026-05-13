@@ -13,7 +13,7 @@ interface  TruckDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertTruck(truck: Truck): Long
 
-    @Query("SELECT *  FROM Truck")
-    suspend fun getAllTruck() : Flow<List<Truck>>
+    @Query("SELECT * FROM Truck")
+    fun getAllTruck(): Flow<List<Truck>>
 
 }

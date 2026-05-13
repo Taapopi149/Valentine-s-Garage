@@ -26,12 +26,11 @@ import com.example.valentinesgarage.Screens.Mechanic.MechanicViewModel
 import com.example.valentinesgarage.Screens.Vehicles.ActiveVehiclesScreen
 import com.example.valentinesgarage.Screens.Vehicles.ActiveVehiclesViewModel
 import com.example.valentinesgarage.Screens.Vehicles.TruckDetailScreen
+import com.example.valentinesgarage.SessionManager
 
 
 @Composable
-fun AppNavigation(mechanicViewModel: MechanicViewModel,
-                  activeVehiclesViewModel: ActiveVehiclesViewModel,
-                  checkInViewModel: CheckInViewModel,
+fun AppNavigation(
                   userDao: UserDao,
                   truckDao: TruckDao,
                   noteDao: NotesDao,
@@ -53,9 +52,9 @@ fun AppNavigation(mechanicViewModel: MechanicViewModel,
 
        // composable("reports") {ReportsScreen(navController)}
 
-        composable("EmployeePage") { EmployeeHomePage(navController) }
-        composable ("MechanicTaskList"){ MechanicVehiclePickerScreen(navController, mechanicViewModel) }
-        composable ("ActiveVehicle"){ ActiveVehiclesScreen(navController, activeVehiclesViewModel) }
+        composable("EmployeePage") { EmployeeHomePage(navController, truckDao, taskDao) }
+        composable ("MechanicTaskList"){ MechanicVehiclePickerScreen(navController, truckDao, taskDao) }
+        composable ("ActiveVehicle"){ ActiveVehiclesScreen(navController, truckDao) }
         composable ("TruckCheckIn"){ TruckCheckInScreen(navController,truckDao, noteDao, taskDao, userDao) }
         composable ("ManagerHome"){ManagerDashboardScreen(navController) }
 
@@ -65,11 +64,13 @@ fun AppNavigation(mechanicViewModel: MechanicViewModel,
             route = "taskBoard/{jobId}"
         ) { backStackEntry ->
 
-            val jobId = backStackEntry.arguments?.getString("jobId") ?: ""
-
+            val jobId = backStackEntry.arguments?.getString("jobId")?.toIntOrNull() ?: return@composable
             MechanicTaskBoardScreen(
                 navController = navController,
-                jobId = jobId
+                jobId = jobId,
+                currentMechanic = SessionManager.currentUser?.firstName ?: "Mechanic",
+                truckDao = truckDao,
+                tasksDao = taskDao
             )
         }
 
@@ -80,8 +81,7 @@ fun AppNavigation(mechanicViewModel: MechanicViewModel,
             )
         ) { backStackEntry ->
 
-            val truckId = backStackEntry.arguments?.getString("truckId")
-
+            val truckId = backStackEntry.arguments?.getString("truckId")?.toIntOrNull() ?: return@composable
             TruckDetailScreen(
                 navController = navController,
                 truckId = truckId// you can rename later to truckId

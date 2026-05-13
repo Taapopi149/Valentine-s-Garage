@@ -23,14 +23,13 @@ class MainActivity : ComponentActivity() {
         val noteDao = database.NotesDao()
         val taskDao = database.TasksDao()
 
-        val mechanicViewModel = ViewModelProvider(this)[MechanicViewModel::class.java]
-        val activeVehiclesViewModel = ViewModelProvider(this)[ActiveVehiclesViewModel::class.java]
-        val checkInViewModel = ViewModelProvider(this)[CheckInViewModel::class.java]
+
+
 
 
         enableEdgeToEdge()
         setContent {
-            AppNavigation(mechanicViewModel, activeVehiclesViewModel, checkInViewModel,userDao = userDao, truckDao = truckDao, noteDao = noteDao, taskDao =taskDao)
+            AppNavigation(userDao = userDao, truckDao = truckDao, noteDao = noteDao, taskDao =taskDao)
         }
     }
 }

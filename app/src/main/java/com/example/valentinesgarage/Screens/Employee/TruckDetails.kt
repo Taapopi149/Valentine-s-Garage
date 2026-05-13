@@ -60,7 +60,7 @@ data class TruckDetail(
 @Composable
 fun TruckDetailScreen(
     navController: NavController,
-    truckId: String?,
+    truckId: Int?,
     // TODO: fetch real data from your ViewModel / repository by truckId
     truck: TruckDetail = sampleTruck
 ) {
@@ -380,17 +380,17 @@ private val sampleTruck = TruckDetail(
     status = TruckStatus.IN_PROGRESS,
     tasks = listOf(
         ServiceTask(
-            "t1",
+            1,
             "Oil & filter change",
             isDone = true,
             completedBy = "David M.",
             completedAt = "09:12",
             note = "Used 10W-40 synthetic"
         ),
-        ServiceTask("t2", "Brake inspection",        isDone = true,  completedBy = "Aina N.",   completedAt = "09:45", note = "Front pads replaced"),
-        ServiceTask("t3", "Tyre pressure check",     isDone = false),
-        ServiceTask("t4", "Coolant top-up",          isDone = false),
-        ServiceTask("t5", "Electrical system check", isDone = false),
+        ServiceTask(1, "Brake inspection",        isDone = true,  completedBy = "Aina N.",   completedAt = "09:45", note = "Front pads replaced"),
+        ServiceTask(2, "Tyre pressure check",     isDone = false),
+        ServiceTask(3, "Coolant top-up",          isDone = false),
+        ServiceTask(4, "Electrical system check", isDone = false),
     )
 )
 
@@ -399,5 +399,5 @@ private val sampleTruck = TruckDetail(
 @Preview(showBackground = true)
 @Composable
 fun TruckDetailPreview() {
-    TruckDetailScreen(navController = rememberNavController(), truckId = "1")
+    TruckDetailScreen(navController = rememberNavController(), truckId = 1)
 }

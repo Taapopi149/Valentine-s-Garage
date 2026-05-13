@@ -28,5 +28,9 @@ data class Tasks (
     val description: String,
     val employeeIdFk: String,
     val truckIdOwner: Int,
-    val status: String
+    val priority: String,
+    val status: String,
+    val completedBy: String = "",
+    val completedAt: String = "",
+    val note: String = ""
 )

@@ -20,122 +20,171 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
+import com.example.valentinesgarage.Data.DAO.TasksDao
+import com.example.valentinesgarage.Data.DAO.TruckDao
+import com.example.valentinesgarage.Data.Entities.Tasks
+import com.example.valentinesgarage.Data.Entities.Truck
+import com.example.valentinesgarage.Screens.Employee.ViewModelFactory.MechanicViewModelFactory
+import com.example.valentinesgarage.Screens.Vehicles.TruckStatus
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.launch
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 
-// ─── Data ─────────────────────────────────────────────────────────────────────
-
-enum class TruckStatus(val label: String) {
-    WAITING("Waiting"),
-    IN_PROGRESS("In Progress"),
-    DONE("Done")
-}
+// ─── UI models ────────────────────────────────────────────────────────────────
 
 data class ServiceTask(
-    val id: String,
+    val id: Int,
     val name: String,
     val isDone: Boolean = false,
-    val completedBy: String? = null,
-    val completedAt: String? = null,
+    val completedBy: String = "",
+    val completedAt: String = "",
     val note: String = ""
 )
 
 data class TruckJob(
-    val id: String,
+    val id: Int,
     val licencePlate: String,
     val driverName: String,
     val status: TruckStatus,
     val tasks: List<ServiceTask>
 )
 
-// ─── Shared ViewModel ─────────────────────────────────────────────────────────
-// Both screens share this ViewModel so task updates are reflected everywhere.
+// ─── ViewModel ────────────────────────────────────────────────────────────────
 
-class MechanicViewModel : ViewModel() {
+class MechanicViewModel(
+    private val truckDao: TruckDao,
+    private val tasksDao: TasksDao
+) : ViewModel() {
 
-    // TODO: replace with Firestore / Room live data
-    var jobs by mutableStateOf(
-        listOf(
-            TruckJob(
-                id = "1",
-                licencePlate = "N 12345 W",
-                driverName = "Johannes Shikongo",
-                status = TruckStatus.IN_PROGRESS,
-                tasks = listOf(
-                    ServiceTask("t1", "Oil & filter change",  isDone = true,  completedBy = "David M.",  completedAt = "09:12", note = "Used 10W-40 synthetic"),
-                    ServiceTask("t2", "Brake inspection",     isDone = true,  completedBy = "Aina N.",   completedAt = "09:45", note = "Front pads replaced"),
-                    ServiceTask("t3", "Tyre pressure check"),
-                    ServiceTask("t4", "Coolant top-up"),
-                    ServiceTask("t5", "Electrical system check"),
-                )
-            ),
-            TruckJob(
-                id = "2",
-                licencePlate = "N 78900 W",
-                driverName = "Petrus Hamutenya",
-                status = TruckStatus.WAITING,
-                tasks = listOf(
-                    ServiceTask("t6",  "Full service inspection"),
-                    ServiceTask("t7",  "Oil change"),
-                    ServiceTask("t8",  "Tyre rotation"),
-                )
-            ),
-            TruckJob(
-                id = "3",
-                licencePlate = "N 55231 W",
-                driverName = "Maria Shipanga",
-                status = TruckStatus.DONE,
-                tasks = listOf(
-                    ServiceTask("t9",  "Oil change",       isDone = true, completedBy = "Simon S.", completedAt = "08:10"),
-                    ServiceTask("t10", "Brake check",      isDone = true, completedBy = "Simon S.", completedAt = "08:30"),
-                    ServiceTask("t11", "Air filter swap",  isDone = true, completedBy = "Simon S.", completedAt = "08:50"),
-                )
-            ),
-        )
-    )
+    private val _jobs = MutableStateFlow<List<TruckJob>>(emptyList())
+    val jobs: StateFlow<List<TruckJob>> = _jobs.asStateFlow()
 
-    // Mark a task as done — only if it hasn't been done yet (enforces single mechanic rule)
-    fun markTaskDone(jobId: String, taskId: String, mechanicName: String, note: String) {
-        val time = LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm"))
-        jobs = jobs.map { job ->
-            if (job.id != jobId) return@map job
-            val updatedTasks = job.tasks.map { task ->
-                if (task.id == taskId && !task.isDone) {
-                    task.copy(isDone = true, completedBy = mechanicName, completedAt = time, note = note)
-                } else task
+    init {
+        loadJobs()
+    }
+
+    private fun loadJobs() {
+        viewModelScope.launch {
+            // Collect all trucks, then for each truck collect its tasks
+            truckDao.getAllTruck().collect { trucks ->
+                // Build a combined flow for all trucks + their tasks
+                val jobList = trucks.map { truck ->
+                    val tasks = tasksDao.getTasksForTruckOnce(truck.truckId)
+                    truck.toTruckJob(tasks)
+                }
+                _jobs.value = jobList
             }
-            // Update truck status based on tasks
-            val allDone = updatedTasks.all { it.isDone }
-            val anyDone = updatedTasks.any { it.isDone }
-            job.copy(
-                tasks = updatedTasks,
-                status = when {
+        }
+    }
+
+    fun getJob(jobId: Int): TruckJob? = _jobs.value.find { it.id == jobId }
+
+    // ── Mark task done ────────────────────────────────────────────────────────
+
+    fun markTaskDone(
+        jobId: Int,
+        taskId: Int,
+        mechanicName: String,
+        note: String
+    ) {
+        val time = LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm"))
+
+        viewModelScope.launch {
+            // 1. Write to DB
+            tasksDao.markTaskComplete(
+                taskId      = taskId,
+                status      = "Done",
+                completedBy = mechanicName,
+                completedAt = time,
+                note        = note
+            )
+
+            // 2. Update local state immediately so UI reacts without waiting for DB flow
+            _jobs.value = _jobs.value.map { job ->
+                if (job.id != jobId) return@map job
+                val updatedTasks = job.tasks.map { task ->
+                    if (task.id == taskId && !task.isDone)
+                        task.copy(isDone = true, completedBy = mechanicName, completedAt = time, note = note)
+                    else task
+                }
+                val allDone = updatedTasks.all { it.isDone }
+                val anyDone = updatedTasks.any { it.isDone }
+                val newStatus = when {
                     allDone -> TruckStatus.DONE
                     anyDone -> TruckStatus.IN_PROGRESS
                     else    -> TruckStatus.WAITING
                 }
-            )
+                // Also persist the new truck status
+                truckDao.updateTruckStatus(jobId, newStatus)
+                job.copy(tasks = updatedTasks, status = newStatus)
+            }
         }
     }
 
-    // Add a custom task to a truck's job
-    fun addCustomTask(jobId: String, taskName: String) {
+    // ── Add custom task ───────────────────────────────────────────────────────
+
+    fun addCustomTask(jobId: Int, taskName: String, employeeId: String = "") {
         if (taskName.isBlank()) return
-        jobs = jobs.map { job ->
-            if (job.id != jobId) return@map job
-            val newTask = ServiceTask(
-                id = "custom_${System.currentTimeMillis()}",
-                name = taskName
+        viewModelScope.launch {
+            tasksDao.insertTask(
+                Tasks(
+                    description  = taskName,
+                    employeeIdFk = employeeId,
+                    truckIdOwner = jobId,
+                    status       = "Pending",
+                    priority     = "Medium"
+                )
             )
-            job.copy(tasks = job.tasks + newTask)
+            // Refresh tasks for this truck
+            val updatedTasks = tasksDao.getTasksForTruckOnce(jobId)
+            _jobs.value = _jobs.value.map { job ->
+                if (job.id != jobId) job
+                else job.copy(tasks = updatedTasks.map { it.toServiceTask() })
+            }
         }
     }
-
-    fun getJob(jobId: String): TruckJob? = jobs.find { it.id == jobId }
 }
+
+// ─── Mappers ──────────────────────────────────────────────────────────────────
+
+private fun Tasks.toServiceTask() = ServiceTask(
+    id          = Taskid,
+    name        = description,
+    isDone      = status == "Done",
+    completedBy = completedBy,
+    completedAt = completedAt,
+    note        = note
+)
+
+private fun Truck.toTruckJob(tasks: List<Tasks>): TruckJob {
+    val serviceTasks = tasks.map { it.toServiceTask() }
+    return TruckJob(
+        id           = truckId,
+        licencePlate = licencePlate,
+        driverName   = DriverName,
+        status       = truckStatus,
+        tasks        = serviceTasks
+    )
+}
+
+// ─── Extra DAO helpers needed ─────────────────────────────────────────────────
+// Add these to TasksDao and TruckDao:
+//
+// TasksDao:
+//   @Query("SELECT * FROM Tasks WHERE truckIdOwner = :truckId")
+//   suspend fun getTasksForTruckOnce(truckId: Int): List<Tasks>
+//
+// TruckDao:
+//   @Query("UPDATE Truck SET truckStatus = :status WHERE truckId = :truckId")
+//   suspend fun updateTruckStatus(truckId: Int, status: TruckStatus)
 
 // ─── Screen 1: Vehicle Picker ─────────────────────────────────────────────────
 
@@ -143,8 +192,15 @@ class MechanicViewModel : ViewModel() {
 @Composable
 fun MechanicVehiclePickerScreen(
     navController: NavController,
-    viewModel: MechanicViewModel = viewModel()
+    truckDao: TruckDao,
+    tasksDao: TasksDao
 ) {
+    val viewModel: MechanicViewModel = viewModel(
+        factory = MechanicViewModelFactory(truckDao, tasksDao)
+    )
+
+    val jobs by viewModel.jobs.collectAsState()
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -167,48 +223,49 @@ fun MechanicVehiclePickerScreen(
         }
     ) { padding ->
 
-        LazyColumn(
-            modifier = Modifier.padding(padding),
-            contentPadding = PaddingValues(12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            item {
-                Text(
-                    text = "VEHICLES ON FLOOR",
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    letterSpacing = 0.8.sp,
-                    modifier = Modifier.padding(bottom = 4.dp)
-                )
+        if (jobs.isEmpty()) {
+            Box(
+                modifier         = Modifier.fillMaxSize().padding(padding),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("No vehicles on the floor", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-
-            items(viewModel.jobs, key = { it.id }) { job ->
-                VehiclePickerCard(
-                    job = job,
-                    onClick = {
-                        navController.navigate("taskBoard/${job.id}")
-                    }
-                )
+        } else {
+            LazyColumn(
+                modifier        = Modifier.padding(padding),
+                contentPadding  = PaddingValues(12.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                item {
+                    Text(
+                        text          = "VEHICLES ON FLOOR",
+                        fontSize      = 10.sp,
+                        fontWeight    = FontWeight.Medium,
+                        color         = MaterialTheme.colorScheme.onSurfaceVariant,
+                        letterSpacing = 0.8.sp,
+                        modifier      = Modifier.padding(bottom = 4.dp)
+                    )
+                }
+                items(jobs, key = { it.id }) { job ->
+                    VehiclePickerCard(
+                        job     = job,
+                        onClick = { navController.navigate("taskBoard/${job.id}") }
+                    )
+                }
             }
         }
     }
 }
 
 @Composable
-fun VehiclePickerCard(
-    job: TruckJob,
-    onClick: () -> Unit
-) {
+fun VehiclePickerCard(job: TruckJob, onClick: () -> Unit) {
     val doneTasks  = job.tasks.count { it.isDone }
     val totalTasks = job.tasks.size
 
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onClick() },
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        modifier  = Modifier.fillMaxWidth().clickable { onClick() },
+        shape     = RoundedCornerShape(12.dp),
+        colors    = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
         Row(
@@ -219,12 +276,12 @@ fun VehiclePickerCard(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Row(
-                    verticalAlignment = Alignment.CenterVertically,
+                    verticalAlignment     = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Text(
-                        text = job.licencePlate,
-                        fontSize = 14.sp,
+                        text       = job.licencePlate,
+                        fontSize   = 14.sp,
                         fontWeight = FontWeight.Medium,
                         fontFamily = FontFamily.Monospace
                     )
@@ -232,22 +289,20 @@ fun VehiclePickerCard(
                 }
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    text = "${job.driverName}  ·  $doneTasks / $totalTasks tasks done",
+                    text  = "${job.driverName}  ·  $doneTasks / $totalTasks tasks done",
                     fontSize = 11.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
             Icon(
-                imageVector = Icons.Default.ChevronRight,
+                imageVector        = Icons.Default.ChevronRight,
                 contentDescription = "Open task board",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(20.dp)
+                tint               = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier           = Modifier.size(20.dp)
             )
         }
     }
 }
-
-
 
 // ─── Screen 2: Task Board ─────────────────────────────────────────────────────
 
@@ -255,13 +310,17 @@ fun VehiclePickerCard(
 @Composable
 fun MechanicTaskBoardScreen(
     navController: NavController,
-    jobId: String,
-    // In a real app pass the logged-in mechanic's name from your auth state
+    jobId: Int,
     currentMechanic: String = "David M.",
-
-    viewModel: MechanicViewModel = viewModel()
+    truckDao: TruckDao,
+    tasksDao: TasksDao
 ) {
-    val job = viewModel.getJob(jobId)
+    val viewModel: MechanicViewModel = viewModel(
+        factory = MechanicViewModelFactory(truckDao, tasksDao)
+    )
+
+    val jobs by viewModel.jobs.collectAsState()
+    val job   = jobs.find { it.id == jobId }
 
     if (job == null) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -270,10 +329,8 @@ fun MechanicTaskBoardScreen(
         return
     }
 
-    // Per-task note input state — stored locally until the mechanic submits
-    val noteState = remember { mutableStateMapOf<String, String>() }
+    val noteState = remember { mutableStateMapOf<Int, String>() }
 
-    // Custom task dialog state
     var showAddTaskDialog by remember { mutableStateOf(false) }
     var customTaskInput   by remember { mutableStateOf("") }
 
@@ -284,21 +341,21 @@ fun MechanicTaskBoardScreen(
     if (showAddTaskDialog) {
         AlertDialog(
             onDismissRequest = { showAddTaskDialog = false; customTaskInput = "" },
-            title = { Text("Add custom task") },
+            title            = { Text("Add custom task") },
             text = {
                 OutlinedTextField(
-                    value = customTaskInput,
+                    value         = customTaskInput,
                     onValueChange = { customTaskInput = it },
-                    placeholder = { Text("e.g. Replace wiper blades") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(10.dp)
+                    placeholder   = { Text("e.g. Replace wiper blades") },
+                    singleLine    = true,
+                    modifier      = Modifier.fillMaxWidth(),
+                    shape         = RoundedCornerShape(10.dp)
                 )
             },
             confirmButton = {
                 TextButton(onClick = {
                     viewModel.addCustomTask(job.id, customTaskInput)
-                    customTaskInput = ""
+                    customTaskInput   = ""
                     showAddTaskDialog = false
                 }) { Text("Add") }
             },
@@ -316,13 +373,13 @@ fun MechanicTaskBoardScreen(
                 title = {
                     Column {
                         Text(
-                            text = job.licencePlate,
+                            text       = job.licencePlate,
                             fontFamily = FontFamily.Monospace,
-                            fontSize = 16.sp,
+                            fontSize   = 16.sp,
                             fontWeight = FontWeight.Medium
                         )
                         Text(
-                            text = "${job.driverName}  ·  ${job.status.label}",
+                            text  = "${job.driverName}  ·  ${job.status.label}",
                             fontSize = 11.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -337,7 +394,7 @@ fun MechanicTaskBoardScreen(
         },
         floatingActionButton = {
             SmallFloatingActionButton(
-                onClick = { showAddTaskDialog = true },
+                onClick        = { showAddTaskDialog = true },
                 containerColor = Color(0xFF1A1A1A)
             ) {
                 Icon(Icons.Default.Add, contentDescription = "Add task", tint = Color.White)
@@ -346,38 +403,36 @@ fun MechanicTaskBoardScreen(
     ) { padding ->
 
         LazyColumn(
-            modifier = Modifier.padding(padding),
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 80.dp),
+            modifier        = Modifier.padding(padding),
+            contentPadding  = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 80.dp),
             verticalArrangement = Arrangement.spacedBy(2.dp)
         ) {
 
             // ── Progress header ───────────────────────────────────────────
             item {
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier              = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment     = Alignment.CenterVertically
                 ) {
                     Text(
                         "SERVICE TASKS",
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize      = 10.sp,
+                        fontWeight    = FontWeight.Medium,
+                        color         = MaterialTheme.colorScheme.onSurfaceVariant,
                         letterSpacing = 0.8.sp
                     )
                     Text(
                         "$doneTasks / $totalTasks done",
                         fontSize = 11.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color    = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
                 Spacer(Modifier.height(6.dp))
                 LinearProgressIndicator(
-                    progress = { progress },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(4.dp),
-                    color = Color(0xFF1A1A1A),
+                    progress   = { progress },
+                    modifier   = Modifier.fillMaxWidth().height(4.dp),
+                    color      = Color(0xFF1A1A1A),
                     trackColor = Color(0xFFEEEEEE)
                 )
                 Spacer(Modifier.height(12.dp))
@@ -386,23 +441,23 @@ fun MechanicTaskBoardScreen(
             // ── Task items ────────────────────────────────────────────────
             items(job.tasks, key = { it.id }) { task ->
                 TaskItem(
-                    task = task,
+                    task            = task,
                     currentMechanic = currentMechanic,
-                    noteValue = noteState[task.id] ?: "",
-                    onNoteChange = { noteState[task.id] = it },
-                    onMarkDone = {
+                    noteValue       = noteState[task.id] ?: "",
+                    onNoteChange    = { noteState[task.id] = it },
+                    onMarkDone      = {
                         viewModel.markTaskDone(
-                            jobId = job.id,
-                            taskId = task.id,
-                            mechanicName = currentMechanic,
-                            note = noteState[task.id] ?: ""
+                            jobId         = job.id,
+                            taskId        = task.id,
+                            mechanicName  = currentMechanic,
+                            note          = noteState[task.id] ?: ""
                         )
                         noteState.remove(task.id)
                     }
                 )
                 HorizontalDivider(
                     thickness = 0.5.dp,
-                    color = MaterialTheme.colorScheme.outlineVariant
+                    color     = MaterialTheme.colorScheme.outlineVariant
                 )
             }
         }
@@ -420,77 +475,67 @@ fun TaskItem(
     onMarkDone: () -> Unit
 ) {
     Column(modifier = Modifier.padding(vertical = 10.dp)) {
-
         Row(
-            verticalAlignment = Alignment.Top,
+            verticalAlignment     = Alignment.Top,
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            // Checkbox — tappable only if not yet done
             Checkbox(
-                checked = task.isDone,
+                checked         = task.isDone,
                 onCheckedChange = { if (!task.isDone) onMarkDone() },
-                enabled = !task.isDone,
-                colors = CheckboxDefaults.colors(
-                    checkedColor = Color(0xFF1A1A1A),
+                enabled         = !task.isDone,
+                colors          = CheckboxDefaults.colors(
+                    checkedColor   = Color(0xFF1A1A1A),
                     uncheckedColor = Color.LightGray
                 ),
                 modifier = Modifier.size(20.dp)
             )
 
             Column(modifier = Modifier.weight(1f)) {
-
-                // Task name — strikethrough when done
                 Text(
-                    text = task.name,
+                    text  = task.name,
                     fontSize = 14.sp,
-                    color = if (task.isDone)
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    else
-                        MaterialTheme.colorScheme.onSurface,
+                    color = if (task.isDone) MaterialTheme.colorScheme.onSurfaceVariant
+                    else MaterialTheme.colorScheme.onSurface,
                     style = if (task.isDone)
                         LocalTextStyle.current.copy(
                             textDecoration = androidx.compose.ui.text.style.TextDecoration.LineThrough
                         )
                     else LocalTextStyle.current
                 )
-
                 Spacer(Modifier.height(3.dp))
 
                 if (task.isDone) {
-                    // Show who did it and when
                     Text(
-                        text = "${task.completedBy}  ·  ${task.completedAt}",
+                        text     = "${task.completedBy}  ·  ${task.completedAt}",
                         fontSize = 11.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color    = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     if (task.note.isNotBlank()) {
                         Text(
-                            text = task.note,
-                            fontSize = 11.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            text      = task.note,
+                            fontSize  = 11.sp,
+                            color     = MaterialTheme.colorScheme.onSurfaceVariant,
                             fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
                         )
                     }
                 } else {
-                    // Note input — only show for the current mechanic on undone tasks
                     Text(
-                        text = "Unclaimed",
+                        text     = "Unclaimed",
                         fontSize = 11.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color    = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Spacer(Modifier.height(6.dp))
                     OutlinedTextField(
-                        value = noteValue,
+                        value         = noteValue,
                         onValueChange = onNoteChange,
-                        placeholder = { Text("Add a note before marking done…", fontSize = 11.sp) },
-                        singleLine = true,
-                        textStyle = LocalTextStyle.current.copy(fontSize = 12.sp),
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(8.dp),
-                        trailingIcon = {
-                            // Mark done button inside the text field
+                        placeholder   = { Text("Add a note before marking done…", fontSize = 11.sp) },
+                        singleLine    = true,
+                        textStyle     = LocalTextStyle.current.copy(fontSize = 12.sp),
+                        modifier      = Modifier.fillMaxWidth(),
+                        shape         = RoundedCornerShape(8.dp),
+                        trailingIcon  = {
                             TextButton(
-                                onClick = onMarkDone,
+                                onClick        = onMarkDone,
                                 contentPadding = PaddingValues(horizontal = 8.dp)
                             ) {
                                 Text("Done", fontSize = 11.sp, color = Color(0xFF1A1A1A))
@@ -503,7 +548,7 @@ fun TaskItem(
     }
 }
 
-// ─── Status badge (shared) ────────────────────────────────────────────────────
+// ─── Status badge ─────────────────────────────────────────────────────────────
 
 @Composable
 fun StatusBadge(status: TruckStatus) {
@@ -514,11 +559,11 @@ fun StatusBadge(status: TruckStatus) {
     }
     Surface(shape = RoundedCornerShape(20.dp), color = bg) {
         Text(
-            text = status.label,
-            fontSize = 10.sp,
+            text       = status.label,
+            fontSize   = 10.sp,
             fontWeight = FontWeight.Medium,
-            color = textColor,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+            color      = textColor,
+            modifier   = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
         )
     }
 }
@@ -528,11 +573,17 @@ fun StatusBadge(status: TruckStatus) {
 @Preview(showBackground = true)
 @Composable
 fun VehiclePickerPreview() {
-    MechanicVehiclePickerScreen(navController = rememberNavController())
-}
-
-@Preview(showBackground = true)
-@Composable
-fun TaskBoardPreview() {
-    MechanicTaskBoardScreen(navController = rememberNavController(), jobId = "1")
+    MaterialTheme {
+        LazyColumn(contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            items(listOf(
+                TruckJob(1, "N 12345 W", "Johannes Shikongo", TruckStatus.IN_PROGRESS, listOf(
+                    ServiceTask(1, "Oil change", isDone = true, completedBy = "David M.", completedAt = "09:12"),
+                    ServiceTask(2, "Brake check")
+                )),
+                TruckJob(2, "N 78900 W", "Petrus Hamutenya", TruckStatus.WAITING, listOf(
+                    ServiceTask(3, "Full inspection")
+                ))
+            )) { job -> VehiclePickerCard(job = job, onClick = {}) }
+        }
+    }
 }

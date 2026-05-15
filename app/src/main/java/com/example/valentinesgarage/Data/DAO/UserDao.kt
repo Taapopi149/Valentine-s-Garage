@@ -5,6 +5,7 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import com.example.valentinesgarage.Data.Entities.User
+import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface UserDao {
@@ -32,7 +33,18 @@ interface UserDao {
     @Query("SELECT * FROM users WHERE role = :role")
     suspend fun getUsersByRole(role: String): List<User>
 
+    @Query("""
+    SELECT * FROM users WHERE 
+    first_name LIKE '%' || :query || '%' OR
+    last_name  LIKE '%' || :query || '%' OR
+    employeeId LIKE '%' || :query || '%' OR
+    role       LIKE '%' || :query || '%' OR
+    Department LIKE '%' || :query || '%'
+""")
+    fun searchUsers(query: String): Flow<List<User>>
 
+    @Query("SELECT * FROM users WHERE role = 'mechanic' OR role = 'Mechanic'")
+    fun getAllMechanics(): Flow<List<User>>
 
 
 }

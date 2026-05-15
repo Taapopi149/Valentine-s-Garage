@@ -15,28 +15,55 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
+import com.example.valentinesgarage.Data.DAO.TasksDao
+import com.example.valentinesgarage.Data.DAO.TruckDao
 import com.example.valentinesgarage.Data.DAO.UserDao
+import com.example.valentinesgarage.Data.Entities.Truck
+import com.example.valentinesgarage.Data.Entities.User
+import com.example.valentinesgarage.Screens.Manager.ViewFactory.ManagerDashboardViewModelFactory
+import com.example.valentinesgarage.Screens.Vehicles.TruckStatus
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.launch
 
-// ─── Data Model ───────────────────────────────────────────────────────────────
+// ─── UI models ────────────────────────────────────────────────────────────────
 
 data class Mechanic(
     val employeeId: String,
     val firstName:  String,
     val lastName:   String,
-    val role:       String,       // e.g. "Senior Mechanic", "Apprentice"
-    val shift:      String,       // e.g. "Morning", "Afternoon"
+    val role:       String,
+    val shift:      String,
     val isActive:   Boolean = true
 ) {
     val fullName get() = "$firstName $lastName"
     val initials get() = "${firstName.first()}${lastName.first()}"
 }
+
+// Unified search result — either a user or a truck
+sealed class SearchResult {
+    data class UserResult(val user: Mechanic)      : SearchResult()
+    data class TruckResult(val truck: TruckSearchItem) : SearchResult()
+}
+
+data class TruckSearchItem(
+    val id:           Int,
+    val licencePlate: String,
+    val driverName:   String,
+    val status:       TruckStatus
+)
 
 // ─── Bottom Nav Routes ────────────────────────────────────────────────────────
 
@@ -46,20 +73,95 @@ sealed class GarageNavRoute(val route: String, val label: String, val icon: Imag
     object Search    : GarageNavRoute("search",    "Search",    Icons.Default.Search)
 }
 
-// ─── Sample Data ────────────────────────────────────────────────────────────── REMOVE WHEN IMPLIMENTING ROOM
+// ─── ViewModel ────────────────────────────────────────────────────────────────
 
-private val sampleMechanics = listOf(
-    Mechanic("MG001", "James",  "Mokoena",   "Senior Mechanic", "Morning",   true),
-    Mechanic("MG002", "Sarah",  "Ndlovu",    "Mechanic",        "Afternoon", true),
-    Mechanic("MG003", "Peter",  "Dlamini",   "Mechanic",        "Morning",   false),
-    Mechanic("MG004", "Anna",   "Shipanga",  "Apprentice",      "Morning",   true),
-    Mechanic("MG005", "David",  "Hamutenya", "Senior Mechanic", "Afternoon", true),
+@OptIn(FlowPreview::class, ExperimentalCoroutinesApi::class)
+class ManagerDashboardViewModel(
+    private val userDao:  UserDao,
+    private val truckDao: TruckDao,
+    private val tasksDao: TasksDao
+) : ViewModel() {
+
+    // ── Stats ─────────────────────────────────────────────────────────────────
+
+    val employeeCount: StateFlow<Int> =
+        userDao.getAllMechanics()
+            .map { it.size }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
+
+    val truckCount: StateFlow<Int> =
+        truckDao.getTruckCount()
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
+
+    val activeTaskCount: StateFlow<Int> =
+        tasksDao.getActiveTaskCount()
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
+
+    // ── Mechanics list ────────────────────────────────────────────────────────
+
+    val mechanics: StateFlow<List<Mechanic>> =
+        userDao.getAllMechanics()
+            .map { list -> list.map { it.toMechanic() } }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    // ── Search ────────────────────────────────────────────────────────────────
+
+    private val _searchQuery = MutableStateFlow("")
+    val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
+
+    // Debounce so DB isn't hit on every keystroke
+    val searchResults: StateFlow<List<SearchResult>> =
+        _searchQuery
+            .debounce(300)
+            .flatMapLatest { query ->
+                if (query.isBlank()) flowOf(emptyList())
+                else combine(
+                    userDao.searchUsers(query).map { users ->
+                        users.map { SearchResult.UserResult(it.toMechanic()) }
+                    },
+                    truckDao.searchTrucks(query).map { trucks ->
+                        trucks.map { SearchResult.TruckResult(it.toTruckSearchItem()) }
+                    }
+                ) { userResults, truckResults ->
+                    userResults + truckResults
+                }
+            }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    fun onSearchQueryChange(query: String) { _searchQuery.value = query }
+    fun clearSearch() { _searchQuery.value = "" }
+}
+
+// ─── Mappers ──────────────────────────────────────────────────────────────────
+
+private fun User.toMechanic() = Mechanic(
+    employeeId = employeeId,
+    firstName  = firstName,
+    lastName   = lastName,
+    role       = role,
+    shift      = shift ?: "N/A",
+    isActive   = true   // add an isActive column to User if you need real values
 )
 
-// ─── Root Screen with Bottom Bar ──────────────────────────────────────────────
+private fun Truck.toTruckSearchItem() = TruckSearchItem(
+    id           = truckId,
+    licencePlate = licencePlate,
+    driverName   = DriverName,
+    status       = truckStatus
+)
+
+// ─── Root Screen ──────────────────────────────────────────────────────────────
 
 @Composable
-fun ManagerDashboardScreen(navController: NavController) {
+fun ManagerDashboardScreen(
+    navController: NavController,
+    userDao:       UserDao,
+    truckDao:      TruckDao,
+    tasksDao:      TasksDao
+) {
+    val viewModel: ManagerDashboardViewModel = viewModel(
+        factory = ManagerDashboardViewModelFactory(userDao, truckDao, tasksDao)
+    )
 
     var selectedRoute by remember { mutableStateOf(GarageNavRoute.Dashboard.route) }
 
@@ -68,6 +170,13 @@ fun ManagerDashboardScreen(navController: NavController) {
         GarageNavRoute.Mechanics,
         GarageNavRoute.Search,
     )
+
+    val mechanics       by viewModel.mechanics.collectAsState()
+    val employeeCount   by viewModel.employeeCount.collectAsState()
+    val truckCount      by viewModel.truckCount.collectAsState()
+    val activeTaskCount by viewModel.activeTaskCount.collectAsState()
+    val searchQuery     by viewModel.searchQuery.collectAsState()
+    val searchResults   by viewModel.searchResults.collectAsState()
 
     Scaffold(
         bottomBar = {
@@ -96,16 +205,23 @@ fun ManagerDashboardScreen(navController: NavController) {
         Box(modifier = Modifier.padding(innerPadding)) {
             when (selectedRoute) {
                 GarageNavRoute.Dashboard.route -> DashboardTab(
-
-                    // add routes here
-                    onAddMechanic = { navController.navigate("addEmployee") },
-                    onReportClick = { navController.navigate("reports") }
+                    mechanics       = mechanics,
+                    employeeCount   = employeeCount,
+                    truckCount      = truckCount,
+                    activeTaskCount = activeTaskCount,
+                    onAddMechanic   = { navController.navigate("addEmployee") },
+                    onReportClick   = { navController.navigate("Report") }
                 )
                 GarageNavRoute.Mechanics.route -> MechanicsTab(
-                    mechanics     = sampleMechanics,
-                    onAddMechanic = { navController.navigate("addEmployee") } // Navigate to AddEmployee
+                    mechanics     = mechanics,
+                    onAddMechanic = { navController.navigate("addEmployee") }
                 )
-                GarageNavRoute.Search.route -> SearchTab(mechanics = sampleMechanics)
+                GarageNavRoute.Search.route -> SearchTab(
+                    query         = searchQuery,
+                    results       = searchResults,
+                    onQueryChange = viewModel::onSearchQueryChange,
+                    onClear       = viewModel::clearSearch
+                )
             }
         }
     }
@@ -114,8 +230,14 @@ fun ManagerDashboardScreen(navController: NavController) {
 // ─── Dashboard Tab ────────────────────────────────────────────────────────────
 
 @Composable
-private fun DashboardTab(onAddMechanic: () -> Unit, onReportClick: () -> Unit) {
-
+private fun DashboardTab(
+    mechanics:       List<Mechanic>,
+    employeeCount:   Int,
+    truckCount:      Int,
+    activeTaskCount: Int,
+    onAddMechanic:   () -> Unit,
+    onReportClick:   () -> Unit
+) {
     LazyColumn(
         modifier            = Modifier.fillMaxSize(),
         contentPadding      = PaddingValues(16.dp),
@@ -129,14 +251,11 @@ private fun DashboardTab(onAddMechanic: () -> Unit, onReportClick: () -> Unit) {
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment     = Alignment.CenterVertically
             ) {
-                Column {
-
-                    Text(
-                        text       = "Valentine's Garage",
-                        style      = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
+                Text(
+                    text       = "Valentine's Garage",
+                    style      = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold
+                )
                 IconButton(onClick = onAddMechanic) {
                     Icon(
                         imageVector        = Icons.Default.Add,
@@ -147,7 +266,7 @@ private fun DashboardTab(onAddMechanic: () -> Unit, onReportClick: () -> Unit) {
             }
         }
 
-        // Stats — garage relevant
+        // Stats — live from DB
         item {
             Row(
                 modifier              = Modifier.fillMaxWidth(),
@@ -155,22 +274,22 @@ private fun DashboardTab(onAddMechanic: () -> Unit, onReportClick: () -> Unit) {
             ) {
                 StatCard(
                     modifier = Modifier.weight(1f),
-                    label    = "Employee",
-                    value    = "5",
+                    label    = "Employees",
+                    value    = employeeCount.toString(),
                     icon     = Icons.Default.Person,
                     color    = MaterialTheme.colorScheme.primary
                 )
                 StatCard(
                     modifier = Modifier.weight(1f),
                     label    = "Trucks",
-                    value    = "4",
+                    value    = truckCount.toString(),
                     icon     = Icons.Default.Build,
                     color    = Color(0xFF22C55E)
                 )
                 StatCard(
                     modifier = Modifier.weight(1f),
-                    label    = "Tasks",
-                    value    = "1",
+                    label    = "Active Tasks",
+                    value    = activeTaskCount.toString(),
                     icon     = Icons.Default.DateRange,
                     color    = Color(0xFFF59E0B)
                 )
@@ -227,18 +346,26 @@ private fun DashboardTab(onAddMechanic: () -> Unit, onReportClick: () -> Unit) {
                     style      = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold
                 )
-                TextButton(onClick = {}) {
-                    Text("See all")
+                TextButton(onClick = {}) { Text("See all") }
+            }
+        }
+
+        // First 3 mechanics from DB
+        items(mechanics.take(3)) { mechanic ->
+            MechanicListItem(mechanic = mechanic)
+        }
+
+        if (mechanics.isEmpty()) {
+            item {
+                Box(
+                    modifier         = Modifier.fillMaxWidth().padding(vertical = 24.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("No employees found", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
 
-        // First 3 mechanics preview
-        items(sampleMechanics.take(3)) { mechanic ->
-            MechanicListItem(mechanic = mechanic)
-        }
-
-        // Add Mechanic button
         item {
             Button(
                 onClick  = onAddMechanic,
@@ -261,7 +388,6 @@ private fun MechanicsTab(
     onAddMechanic: () -> Unit
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
-
         Row(
             modifier              = Modifier
                 .fillMaxWidth()
@@ -270,7 +396,7 @@ private fun MechanicsTab(
             verticalAlignment     = Alignment.CenterVertically
         ) {
             Text(
-                text       = "All Employee",
+                text       = "All Employees",
                 style      = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold
             )
@@ -281,12 +407,21 @@ private fun MechanicsTab(
             }
         }
 
-        LazyColumn(
-            contentPadding      = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            items(mechanics) { mechanic ->
-                MechanicListItem(mechanic = mechanic)
+        if (mechanics.isEmpty()) {
+            Box(
+                modifier         = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("No employees yet", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        } else {
+            LazyColumn(
+                contentPadding      = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                items(mechanics, key = { it.employeeId }) { mechanic ->
+                    MechanicListItem(mechanic = mechanic)
+                }
             }
         }
     }
@@ -295,42 +430,33 @@ private fun MechanicsTab(
 // ─── Search Tab ───────────────────────────────────────────────────────────────
 
 @Composable
-private fun SearchTab(mechanics: List<Mechanic>) {
-
-    var query by remember { mutableStateOf("") }
-
-    val filtered = remember(query) {
-        if (query.isBlank()) mechanics
-        else mechanics.filter { m ->
-            m.fullName.contains(query, ignoreCase = true)   ||
-                    m.employeeId.contains(query, ignoreCase = true) ||
-                    m.role.contains(query, ignoreCase = true)       ||
-                    m.shift.contains(query, ignoreCase = true)
-        }
-    }
-
+private fun SearchTab(
+    query:         String,
+    results:       List<SearchResult>,
+    onQueryChange: (String) -> Unit,
+    onClear:       () -> Unit
+) {
     Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-
         Text(
-            text       = "Search Employee",
+            text       = "Search",
             style      = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold
         )
 
         OutlinedTextField(
             value         = query,
-            onValueChange = { query = it },
+            onValueChange = onQueryChange,
             modifier      = Modifier.fillMaxWidth(),
-            placeholder   = { Text("Search by name or ID…") },
+            placeholder   = { Text("Search employees or trucks…") },
             leadingIcon   = { Icon(Icons.Default.Search, contentDescription = null) },
             trailingIcon  = {
                 if (query.isNotEmpty()) {
-                    IconButton(onClick = { query = "" }) { //Query Geos here ROOM
+                    IconButton(onClick = onClear) {
                         Icon(Icons.Default.Close, contentDescription = "Clear")
                     }
                 }
@@ -341,18 +467,22 @@ private fun SearchTab(mechanics: List<Mechanic>) {
 
         if (query.isNotBlank()) {
             Text(
-                text  = "${filtered.size} result(s) found",
+                text  = "${results.size} result(s) found",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
 
         LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            items(filtered) { mechanic ->
-                MechanicListItem(mechanic = mechanic)
+
+            items(results) { result ->
+                when (result) {
+                    is SearchResult.UserResult  -> MechanicListItem(mechanic = result.user)
+                    is SearchResult.TruckResult -> TruckSearchCard(truck = result.truck)
+                }
             }
 
-            if (filtered.isEmpty()) {
+            if (query.isNotBlank() && results.isEmpty()) {
                 item {
                     Box(
                         modifier         = Modifier
@@ -369,7 +499,7 @@ private fun SearchTab(mechanics: List<Mechanic>) {
                             )
                             Spacer(Modifier.height(8.dp))
                             Text(
-                                text  = "No Employees found",
+                                text  = "No results found",
                                 style = MaterialTheme.typography.bodyLarge,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -381,7 +511,74 @@ private fun SearchTab(mechanics: List<Mechanic>) {
     }
 }
 
-// ─── Reusable Components ──────────────────────────────────────────────────────
+// ─── Truck search card ────────────────────────────────────────────────────────
+
+@Composable
+private fun TruckSearchCard(truck: TruckSearchItem) {
+    val (statusColor, statusBg) = when (truck.status) {
+        TruckStatus.WAITING     -> Color(0xFF1D4ED8) to Color(0xFFEFF6FF)
+        TruckStatus.IN_PROGRESS -> Color(0xFFB45309) to Color(0xFFFFFBEB)
+        TruckStatus.DONE        -> Color(0xFF065F46) to Color(0xFFECFDF5)
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape    = RoundedCornerShape(12.dp),
+        colors   = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+        )
+    ) {
+        Row(
+            modifier          = Modifier.padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Truck icon box
+            Box(
+                modifier         = Modifier
+                    .size(44.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.secondary.copy(alpha = 0.15f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector        = Icons.Default.Build,
+                    contentDescription = null,
+                    tint               = MaterialTheme.colorScheme.secondary,
+                    modifier           = Modifier.size(20.dp)
+                )
+            }
+
+            Spacer(Modifier.width(12.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text       = truck.licencePlate,
+                    style      = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    fontFamily = FontFamily.Monospace
+                )
+                Text(
+                    text     = truck.driverName,
+                    style    = MaterialTheme.typography.bodySmall,
+                    color    = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            // Status badge
+            Surface(shape = RoundedCornerShape(20.dp), color = statusBg) {
+                Text(
+                    text       = truck.status.label,
+                    modifier   = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                    style      = MaterialTheme.typography.labelSmall,
+                    color      = statusColor,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+        }
+    }
+}
+
+// ─── Reusable components (unchanged) ─────────────────────────────────────────
 
 @Composable
 private fun StatCard(
@@ -422,9 +619,7 @@ private fun QuickActionCard(
         onClick  = onClick
     ) {
         Column(
-            modifier            = Modifier
-                .padding(12.dp)
-                .fillMaxWidth(),
+            modifier            = Modifier.padding(12.dp).fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
@@ -462,7 +657,6 @@ private fun MechanicListItem(mechanic: Mechanic) {
             modifier          = Modifier.padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Avatar with initials
             Box(
                 modifier         = Modifier
                     .size(44.dp)
@@ -480,7 +674,6 @@ private fun MechanicListItem(mechanic: Mechanic) {
 
             Spacer(Modifier.width(12.dp))
 
-            // Name, role, employee ID and shift
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text       = mechanic.fullName,
@@ -503,7 +696,6 @@ private fun MechanicListItem(mechanic: Mechanic) {
                 )
             }
 
-            // On Shift / Off Duty badge
             Surface(
                 shape = RoundedCornerShape(20.dp),
                 color = if (mechanic.isActive) Color(0xFF22C55E).copy(alpha = 0.15f)
@@ -527,6 +719,34 @@ private fun MechanicListItem(mechanic: Mechanic) {
 @Composable
 fun ManagerDashboardScreenPreview() {
     MaterialTheme {
-        ManagerDashboardScreen(navController = rememberNavController())
+        Scaffold(
+            bottomBar = {
+                NavigationBar {
+                    listOf("Dashboard", "Mechanics", "Search").forEachIndexed { i, label ->
+                        NavigationBarItem(
+                            selected = i == 0,
+                            onClick  = {},
+                            icon     = { Icon(Icons.Default.Home, null) },
+                            label    = { Text(label) }
+                        )
+                    }
+                }
+            }
+        ) { padding ->
+            Box(modifier = Modifier.padding(padding)) {
+                DashboardTab(
+                    mechanics       = listOf(
+                        Mechanic("MG001", "James", "Mokoena",  "Senior Mechanic", "Morning",   true),
+                        Mechanic("MG002", "Sarah", "Ndlovu",   "Mechanic",        "Afternoon", true),
+                        Mechanic("MG003", "Peter", "Dlamini",  "Mechanic",        "Morning",   false),
+                    ),
+                    employeeCount   = 5,
+                    truckCount      = 4,
+                    activeTaskCount = 3,
+                    onAddMechanic   = {},
+                    onReportClick   = {}
+                )
+            }
+        }
     }
 }

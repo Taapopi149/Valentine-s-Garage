@@ -50,6 +50,7 @@ interface TasksDao {
     @Query("SELECT * FROM Tasks WHERE employeeIdFk =:employeeId")
     fun getTasksForEmployee(employeeId: String): Flow<List<Tasks>>
 
-
+    @Query("SELECT COUNT(*) FROM Tasks WHERE status != 'Done'")
+    fun getActiveTaskCount(): Flow<Int>
 
 }

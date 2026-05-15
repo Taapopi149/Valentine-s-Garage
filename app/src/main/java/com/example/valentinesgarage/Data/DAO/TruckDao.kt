@@ -31,6 +31,18 @@ interface  TruckDao {
     @Query("UPDATE Truck SET truckStatus = :status WHERE truckId = :truckId")
     suspend fun updateTruckStatus(truckId: Int, status: TruckStatus)
 
+    @Query("""
+    SELECT * FROM Truck WHERE
+    licencePlate LIKE '%' || :query || '%' OR
+    DriverName   LIKE '%' || :query || '%'
+""")
+    fun searchTrucks(query: String): Flow<List<Truck>>
+
+
+    @Query("SELECT COUNT(*) FROM Truck")
+    fun getTruckCount(): Flow<Int>
+
+
 
 
 }

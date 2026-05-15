@@ -90,39 +90,112 @@ data class TruckCheckInForm(
 )
 
 // ─── ViewModel ────────────────────────────────────────────────────────────────
-
-class CheckInViewModel(
+          class CheckInViewModel(
     private val truckDao: TruckDao,
-    private val notesDao: NotesDao,
     private val tasksDao: TasksDao,
+    private val notesDao: NotesDao,
     private val userDao: UserDao
 ) : ViewModel() {
 
     var form by mutableStateOf(TruckCheckInForm())
         private set
 
-    private var mechanicUsers by mutableStateOf<List<User>>(emptyList())
-
-    val availableMechanics: List<String>
-        get() = mechanicUsers.map { "${it.firstName} ${it.lastName}" }
+    var availableMechanics by mutableStateOf<List<String>>(emptyList())
+        private set
 
     init {
-        loadMechanics()
-    }
-
-    private fun loadMechanics() {
-        viewModelScope.launch {
-            mechanicUsers = userDao.getUsersByRole("mechanic")
+        // Load real mechanics from Room instead of hardcoded list
+        viewModelScope.launch(Dispatchers.IO) {
+            val mechanics = userDao.getMechanics()
+            withContext(Dispatchers.Main) {
+                availableMechanics = mechanics.map { "${it.firstName} ${it.lastName}" }
+            }
         }
     }
 
-    fun onLicencePlateChange(value: String)        { form = form.copy(licencePlate = value) }
-    fun onDriverNameChange(value: String)          { form = form.copy(driverName = value) }
-    fun onOdometerChange(value: String)            { form = form.copy(odometer = value.filter { it.isDigit() }) }
-    fun onConditionChange(c: VehicleCondition)     { form = form.copy(condition = c) }
-    fun onPhotosAdded(uris: List<Uri>)             { form = form.copy(photoUris = (form.photoUris + uris).take(5)) }
-    fun onPhotoTaken(uri: Uri)                     { form = form.copy(photoUris = (form.photoUris + uri).take(5)) }
-    fun onNotesChange(value: String)               { form = form.copy(notes = value) }
+    fun onLicencePlateChange(value: String) { form = form.copy(licencePlate = value) }
+    fun onDriverNameChange(value: String)   { form = form.copy(driverName = value) }
+    fun onOdometerChange(value: String)     { form = form.copy(odometer = value.filter { it.isDigit() }) }
+    fun onConditionChange(c: VehicleCondition) { form = form.copy(condition = c) }
+    fun onPhotosAdded(uris: List<Uri>)      { form = form.copy(photoUris = (form.photoUris + uris).take(5)) }
+    fun onPhotoTaken(uri: Uri)              { form = form.copy(photoUris = (form.photoUris + uri).take(5)) }
+    fun onNotesChange(value: String)        { form = form.copy(notes = value) }
+
+    fun addTask(description: String, mechanic: String) {
+        if (description.isBlank() || mechanic.isBlank()) return
+        val task = AssignedTask(
+            id = "task_${System.currentTimeMillis()}",
+            description = description.trim(),
+            assignedTo = mechanic
+        )
+        form = form.copy(assignedTasks = form.assignedTasks + task)
+    }
+
+    fun removeTask(taskId: String) {
+        form = form.copy(assignedTasks = form.assignedTasks.filter { it.id != taskId })
+    }
+
+    fun createCameraUri(context: Context): Uri {
+        val imageFile = File.createTempFile("truck_", ".jpg", context.cacheDir)
+        return FileProvider.getUriForFile(
+            context,
+            "${context.packageName}.provider",
+            imageFile
+        )
+    }
+
+    fun submitCheckIn(onSuccess: () -> Unit) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                // 1. Save the truck
+                val truck = Truck(
+                    licencePlate = form.licencePlate.trim(),
+                    DriverName   = form.driverName.trim(),
+                    Odmeter      = form.odometer.toIntOrNull() ?: 0,
+                    Condition    = form.condition,
+                    truckStatus  = TruckStatus.WAITING,
+                    photoUris    = form.photoUris.joinToString(",") { it.toString() }
+                )
+                truckDao.insertTruck(truck)
+
+                // 2. Save notes if any
+                if (form.notes.isNotBlank()) {
+                    notesDao.insertNote(
+                        Notes(
+                            truckId  = form.licencePlate.trim(),
+                            noteText = form.notes.trim()
+                        )
+                    )
+                }
+
+                // 3. Save each assigned task
+                val taskEntities = form.assignedTasks.map { assignedTask ->
+                    Tasks(
+                        description  = assignedTask.description,
+                        employeeIdFk = assignedTask.assignedTo,
+                        truckId      = form.licencePlate.trim(),
+                        status       = "pending"
+                    )
+                }
+                if (taskEntities.isNotEmpty()) {
+                    tasksDao.insertTasks(taskEntities)
+                }
+
+                withContext(Dispatchers.Main) { onSuccess() }
+
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    println("Check-in error: ${e.message}")
+                }
+            }
+        }
+    }
+
+    fun isFormValid(): Boolean =
+        form.licencePlate.isNotBlank() &&
+                form.driverName.isNotBlank() &&
+                form.odometer.isNotBlank()
+}
 
     // ── Task assignment ───────────────────────────────────────────────────────
 

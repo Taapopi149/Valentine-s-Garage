@@ -18,12 +18,12 @@ class CheckInViewModelFactory(
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(CheckInViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
-            return CheckInViewModel(
-                truckDao,
-                notesDao,
-                tasksDao,
-                userDao
-            ) as T
+          return CheckInViewModel(
+    truckDao,
+    tasksDao, 
+    notesDao,  
+    userDao
+) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }

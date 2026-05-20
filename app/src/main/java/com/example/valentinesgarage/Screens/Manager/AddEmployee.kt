@@ -13,7 +13,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalClipboardManager
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -21,14 +20,12 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
-import androidx.navigation.compose.rememberNavController
 import com.example.valentinesgarage.Data.DAO.UserDao
 import com.example.valentinesgarage.PassWordHashing.PasswordUtils
 import com.example.valentinesgarage.Screens.Manager.ViewFactory.AddEmployeeViewModelFactory
@@ -258,7 +255,7 @@ fun AddEmployeeScreen(navController: NavController, userDao: UserDao) {
             FormField(
                 value         = last_Name,
                 onValueChange = { last_Name = it; nameError = false },
-                label         = "Last Name *",
+                label         = "Last Name",
                 placeholder   = "e.g. Johnson",
                 isError       = nameError,
                 errorMessage  = "Full name is required",
@@ -270,7 +267,7 @@ fun AddEmployeeScreen(navController: NavController, userDao: UserDao) {
             FormField(
                 value         = email,
                 onValueChange = { email = it; emailError = false },
-                label         = "Email Address *",
+                label         = "Email Address ",
                 placeholder   = "e.g. alice@company.com",
                 isError       = emailError,
                 errorMessage  = "Enter a valid email address",
@@ -519,7 +516,7 @@ fun AddEmployeeScreen(navController: NavController, userDao: UserDao) {
                         modifier           = Modifier.size(16.dp)
                     )
                     Text(
-                        text  = "Password includes uppercase, lowercase, numbers and special characters. Hit 🔄 to regenerate.",
+                        text  = "Password includes uppercase, lowercase, numbers and special characters. Hit refresh to regenerate.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -668,8 +665,3 @@ private fun FormField(
         }
     }
 }
-
-
-// Preview
-
-

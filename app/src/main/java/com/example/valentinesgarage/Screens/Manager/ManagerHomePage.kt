@@ -25,7 +25,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
-import androidx.navigation.compose.rememberNavController
 import com.example.valentinesgarage.Data.DAO.TasksDao
 import com.example.valentinesgarage.Data.DAO.TruckDao
 import com.example.valentinesgarage.Data.DAO.UserDao
@@ -36,7 +35,6 @@ import com.example.valentinesgarage.Screens.Vehicles.TruckStatus
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.*
-import kotlinx.coroutines.launch
 
 // ─── UI models ────────────────────────────────────────────────────────────────
 
@@ -132,8 +130,9 @@ class ManagerDashboardViewModel(
     fun clearSearch() { _searchQuery.value = "" }
 }
 
-// ─── Mappers ──────────────────────────────────────────────────────────────────
+// is Active does not work (will break the whole page for some reason)
 
+// ─── Mappers ──────────────────────────────────────────────────────────────────
 private fun User.toMechanic() = Mechanic(
     employeeId = employeeId,
     firstName  = firstName,

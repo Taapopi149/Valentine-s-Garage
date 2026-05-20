@@ -39,7 +39,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
-import androidx.navigation.compose.rememberNavController
 import coil.compose.rememberAsyncImagePainter
 import com.example.valentinesgarage.Data.DAO.NotesDao
 import com.example.valentinesgarage.Data.DAO.TasksDao
@@ -126,7 +125,7 @@ class CheckInViewModel(
 
     // ── Task assignment ───────────────────────────────────────────────────────
 
-    // FIX 1: addTask now accepts priority as a parameter
+
     fun addTask(description: String, mechanic: String, priority: TaskPriority) {
         if (description.isBlank() || mechanic.isBlank()) return
         val task = AssignedTask(
@@ -190,7 +189,7 @@ class CheckInViewModel(
                             employeeIdFk = mechanic.employeeId,
                             truckIdOwner = newTruckId.toInt(),
                             status       = "Pending",
-                            priority     = assignedTask.priority.label  // FIX 2: typo was "priorty"
+                            priority     = assignedTask.priority.label
                         )
                     )
                 }
@@ -230,7 +229,8 @@ fun TruckCheckInScreen(
     var taskInput            by remember { mutableStateOf("") }
     var selectedMechanic     by remember(mechanics) { mutableStateOf(mechanics.firstOrNull() ?: "") }
     var mechanicDropdownOpen by remember { mutableStateOf(false) }
-    // FIX 3: declare selectedPriority here — was used in UI but never declared
+
+
     var selectedPriority     by remember { mutableStateOf(TaskPriority.MEDIUM) }
 
     val cameraLauncher = rememberLauncherForActivityResult(
@@ -389,7 +389,7 @@ fun TruckCheckInScreen(
                 )
                 Button(
                     onClick = {
-                        // FIX 1: pass selectedPriority into addTask
+
                         viewModel.addTask(taskInput, selectedMechanic, selectedPriority)
                         taskInput        = ""
                         selectedPriority = TaskPriority.MEDIUM  // reset after adding
@@ -558,7 +558,7 @@ fun AssignedTaskChip(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(Modifier.height(4.dp))
-                // FIX 3: dot and label were stacked vertically — wrap in a Row
+
                 Row(
                     verticalAlignment     = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(4.dp)

@@ -53,4 +53,10 @@ interface TasksDao {
     @Query("SELECT COUNT(*) FROM Tasks WHERE status != 'Done'")
     fun getActiveTaskCount(): Flow<Int>
 
+    @Query("""
+    SELECT COUNT(*) FROM Tasks 
+    WHERE employeeIdFk = :employeeId AND status = :status
+""")
+    suspend fun getTaskCountByStatus(employeeId: String, status: String): Int
+
 }

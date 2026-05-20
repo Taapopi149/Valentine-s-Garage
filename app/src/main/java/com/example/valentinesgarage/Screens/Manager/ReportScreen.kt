@@ -1,13 +1,10 @@
 package com.example.valentinesgarage.Screens.Manager
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -27,11 +24,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
+import com.example.valentinesgarage.Screens.CheckIn.VehicleCondition
 
 // ── Data models ──────────────────────────────────────────────────────────────
 
 data class EmployeeActivity(
-    val initials: String,
+
     val name: String,
     val role: String,
     val totalTasks: Int,
@@ -51,13 +49,13 @@ data class VehicleCheckIn(
     val notes: String
 )
 
-enum class VehicleCondition { GOOD, FAIR, POOR }
+
 
 // ── Sample data ───────────────────────────────────────────────────────────────
 
 val sampleEmployees = listOf(
     EmployeeActivity(
-        initials = "JK", name = "J. Kambonde", role = "Mechanic", totalTasks = 8,
+        name = "J. Kambonde", role = "Mechanic", totalTasks = 8,
         tasks = listOf(
             TaskEntry("Engine oil change", 3),
             TaskEntry("Brake inspection", 2),
@@ -68,7 +66,7 @@ val sampleEmployees = listOf(
         avatarColor = Color(0xFFE6F1FB), avatarTextColor = Color(0xFF0C447C)
     ),
     EmployeeActivity(
-        initials = "PN", name = "P. Nangolo", role = "Mechanic", totalTasks = 7,
+        name = "P. Nangolo", role = "Mechanic", totalTasks = 7,
         tasks = listOf(
             TaskEntry("Transmission check", 3),
             TaskEntry("Air filter replacement", 2),
@@ -78,7 +76,7 @@ val sampleEmployees = listOf(
         avatarColor = Color(0xFFE1F5EE), avatarTextColor = Color(0xFF085041)
     ),
     EmployeeActivity(
-        initials = "MS", name = "M. Shipanga", role = "Mechanic", totalTasks = 5,
+        name = "M. Shipanga", role = "Mechanic", totalTasks = 5,
         tasks = listOf(
             TaskEntry("Exhaust inspection", 2),
             TaskEntry("Battery test", 2),
@@ -88,7 +86,7 @@ val sampleEmployees = listOf(
         avatarColor = Color(0xFFFAEEDA), avatarTextColor = Color(0xFF633806)
     ),
     EmployeeActivity(
-        initials = "TI", name = "T. Iipinge", role = "Mechanic", totalTasks = 6,
+        name = "T. Iipinge", role = "Mechanic", totalTasks = 6,
         tasks = listOf(
             TaskEntry("Fuel filter replacement", 3),
             TaskEntry("Differential fluid", 2),
@@ -400,7 +398,7 @@ fun EmployeeCard(employee: EmployeeActivity) {
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        employee.initials,
+                        "EMP",
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Medium,
                         color = employee.avatarTextColor
@@ -576,6 +574,7 @@ fun ConditionBadge(condition: VehicleCondition) {
         VehicleCondition.GOOD  -> Triple(Color(0xFFEAF3DE), Color(0xFF27500A), "Good")
         VehicleCondition.FAIR  -> Triple(Color(0xFFFAEEDA), Color(0xFF633806), "Fair")
         VehicleCondition.POOR  -> Triple(Color(0xFFFCEBEB), Color(0xFF791F1F), "Poor")
+        VehicleCondition.EXCELLENT  -> Triple(Color(0xFFEAF3DE), Color(0xFF27500A), "Good")
     }
     Box(
         modifier = Modifier

@@ -4,12 +4,14 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import com.example.valentinesgarage.Data.DAO.TasksDao
 import com.example.valentinesgarage.Data.DAO.TruckDao
+import com.example.valentinesgarage.Data.DAO.UserDao
 import com.example.valentinesgarage.Screens.Mechanic.MechanicViewModel
 
 
 class MechanicViewModelFactory(
     private val truckDao: TruckDao,
     private val tasksDao: TasksDao,
+    private val userDao: UserDao
 ) : ViewModelProvider.Factory {
 
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
@@ -18,6 +20,7 @@ class MechanicViewModelFactory(
             return MechanicViewModel(
                 truckDao,
                 tasksDao,
+                userDao
 
             ) as T
         }

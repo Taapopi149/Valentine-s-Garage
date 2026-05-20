@@ -46,5 +46,31 @@ interface UserDao {
     @Query("SELECT * FROM users WHERE role = 'mechanic' OR role = 'Mechanic'")
     fun getAllMechanics(): Flow<List<User>>
 
+    @Query("SELECT * FROM users WHERE employeeId = :id")
+    fun getUserId(id: String): Flow<User?>
+
+
+    @Query("""
+    UPDATE users SET 
+    first_name  = :firstName,
+    last_name   = :lastName,
+    email       = :email,
+    phone       = :phone,
+    Department  = :department,
+    shift       = :shift
+    WHERE employeeId = :employeeId
+""")
+    suspend fun updateUser(
+        employeeId:  String,
+        firstName:   String,
+        lastName:    String,
+        email:       String,
+        phone:       String,
+        department:  String,
+        shift:       String
+    )
+
+    @Query("SELECT first_name || ' ' || last_name FROM users WHERE employeeId = :id")
+    suspend fun getFullNameById(id: String): String?
 
 }

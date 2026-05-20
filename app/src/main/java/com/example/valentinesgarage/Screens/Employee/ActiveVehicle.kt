@@ -22,7 +22,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
-import androidx.navigation.compose.rememberNavController
 import com.example.valentinesgarage.Data.DAO.TruckDao
 import com.example.valentinesgarage.Data.Entities.Truck
 import com.example.valentinesgarage.Screens.Employee.ViewModelFactory.ActiveVehiclesViewModelFactory
@@ -54,6 +53,8 @@ class ActiveVehiclesViewModel(
     private val truckDao: TruckDao
 ) : ViewModel() {
 
+
+    // Creating reactive state holders for list trucks
     private val _trucks = MutableStateFlow<List<ActiveTruck>>(emptyList())
     val trucks: StateFlow<List<ActiveTruck>> = _trucks.asStateFlow()
 
@@ -160,7 +161,7 @@ fun ActiveVehiclesScreen(
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     items(filtered, key = { it.id }) { truck ->
-                        TruckCard(
+                        TruckCardActive(
                             truck   = truck,
                             onClick = { navController.navigate("truckDetail/${truck.id}") }
                         )
@@ -204,7 +205,7 @@ fun StatusFilterRow(
 // ─── Truck card ───────────────────────────────────────────────────────────────
 
 @Composable
-fun TruckCard(
+fun TruckCardActive(
     truck: ActiveTruck,
     onClick: () -> Unit
 ) {
@@ -293,7 +294,7 @@ fun ActiveVehiclesPreview() {
                     ActiveTruck("1", "N 12345 W", "Johannes Shikongo", "09:00", TruckStatus.IN_PROGRESS),
                     ActiveTruck("2", "N 78900 W", "Petrus Hamutenya",  "08:30", TruckStatus.WAITING),
                     ActiveTruck("3", "N 55231 W", "Maria Shipanga",    "07:45", TruckStatus.DONE),
-                )) { truck -> TruckCard(truck = truck, onClick = {}) }
+                )) { truck -> TruckCardActive(truck = truck, onClick = {}) }
             }
         }
     }

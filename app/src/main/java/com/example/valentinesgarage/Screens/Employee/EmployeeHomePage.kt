@@ -1,6 +1,6 @@
 package com.example.valentinesgarage.Screens.Employee
 
-import android.R.attr.priority
+
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -36,7 +36,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
-import androidx.navigation.compose.rememberNavController
 import com.example.valentinesgarage.Data.DAO.TasksDao
 import com.example.valentinesgarage.Data.DAO.TruckDao
 import com.example.valentinesgarage.Data.DataClasses.TaskWithPlate

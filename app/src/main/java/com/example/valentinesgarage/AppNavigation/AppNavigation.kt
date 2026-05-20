@@ -11,23 +11,19 @@ import com.example.valentinesgarage.Data.DAO.TasksDao
 import com.example.valentinesgarage.Data.DAO.TruckDao
 import com.example.valentinesgarage.Data.DAO.UserDao
 import com.example.valentinesgarage.Login.Login
-import com.example.valentinesgarage.Login.LoginViewModel
 import com.example.valentinesgarage.Login.SignUp
 import com.example.valentinesgarage.Manager.ManagerDashboardScreen
-import com.example.valentinesgarage.Screens.CheckIn.CheckInViewModel
 import com.example.valentinesgarage.Screens.CheckIn.TruckCheckInScreen
 import com.example.valentinesgarage.Screens.Employee.EmployeeHomePage
 import com.example.valentinesgarage.Screens.Employee.EmployeeProfilePage
 import com.example.valentinesgarage.Screens.Manager.AddEmployeeScreen
 import com.example.valentinesgarage.Screens.Manager.ReportsScreen
-// import com.example.valentinesgarage.Screens.Manager.ReportsScreen
 import com.example.valentinesgarage.Screens.Mechanic.MechanicTaskBoardScreen
 import com.example.valentinesgarage.Screens.Mechanic.MechanicVehiclePickerScreen
-import com.example.valentinesgarage.Screens.Mechanic.MechanicViewModel
 import com.example.valentinesgarage.Screens.Vehicles.ActiveVehiclesScreen
-import com.example.valentinesgarage.Screens.Vehicles.ActiveVehiclesViewModel
 import com.example.valentinesgarage.Screens.Vehicles.TruckDetailScreen
 import com.example.valentinesgarage.SessionManager
+
 
 
 @Composable
@@ -54,10 +50,10 @@ fun AppNavigation(
        // composable("reports") {ReportsScreen(navController)}
 
         composable("EmployeePage") { EmployeeHomePage(navController, truckDao, taskDao) }
-        composable ("MechanicTaskList"){ MechanicVehiclePickerScreen(navController, truckDao, taskDao) }
+        composable ("MechanicTaskList"){ MechanicVehiclePickerScreen(navController, truckDao, taskDao, userDao) }
         composable ("ActiveVehicle"){ ActiveVehiclesScreen(navController, truckDao) }
         composable ("TruckCheckIn"){ TruckCheckInScreen(navController,truckDao, noteDao, taskDao, userDao) }
-        composable ("ManagerHome"){ManagerDashboardScreen(navController) }
+        composable ("ManagerHome"){ManagerDashboardScreen(navController, userDao, truckDao, taskDao) }
 
         composable("addEmployee"){AddEmployeeScreen(navController, userDao)}
 
@@ -71,7 +67,8 @@ fun AppNavigation(
                 jobId = jobId,
                 currentMechanic = SessionManager.currentUser?.firstName ?: "Mechanic",
                 truckDao = truckDao,
-                tasksDao = taskDao
+                tasksDao = taskDao,
+                userDao = userDao
             )
         }
 
@@ -85,11 +82,11 @@ fun AppNavigation(
             val truckId = backStackEntry.arguments?.getString("truckId")?.toIntOrNull() ?: return@composable
             TruckDetailScreen(
                 navController = navController,
-                truckId = truckId// you can rename later to truckId
+                truckId = truckId
             )
         }
 
-        composable ("Profile"){ EmployeeProfilePage(navController) }
+        composable ("Profile"){ EmployeeProfilePage(navController, userDao, taskDao) }
        composable("Report") { ReportsScreen(navController) }
 
     }

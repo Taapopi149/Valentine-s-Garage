@@ -40,8 +40,49 @@ interface UserDao {
 
     /**
      * Observes all users in the database.
-     * Returns a Flow that emits a new list whenever any change occurs in the users table.
      */
     @Query("SELECT * FROM users")
     fun getAllUsers(): Flow<List<User>>
+
+    @Query("SELECT * FROM users WHERE role = :role")
+    suspend fun getUsersByRole(role: String): List<User>
+
+    @Query("""
+    SELECT * FROM users WHERE 
+    first_name LIKE '%' || :query || '%' OR
+    last_name  LIKE '%' || :query || '%' OR
+    employeeId LIKE '%' || :query || '%' OR
+    role       LIKE '%' || :query || '%' OR
+    Department LIKE '%' || :query || '%'
+""")
+    fun searchUsers(query: String): Flow<List<User>>
+
+    @Query("SELECT * FROM users WHERE role = 'mechanic' OR role = 'Mechanic'")
+    fun getAllMechanics(): Flow<List<User>>
+
+    @Query("SELECT * FROM users WHERE employeeId = :id")
+    fun getUserId(id: String): Flow<User?>
+
+    @Query("""
+    UPDATE users SET 
+    first_name  = :firstName,
+    last_name   = :lastName,
+    email       = :email,
+    phone       = :phone,
+    Department  = :department,
+    shift       = :shift
+    WHERE employeeId = :employeeId
+""")
+    suspend fun updateUser(
+        employeeId:  String,
+        firstName:   String,
+        lastName:    String,
+        email:       String,
+        phone:       String,
+        department:  String,
+        shift:       String
+    )
+
+    @Query("SELECT first_name || ' ' || last_name FROM users WHERE employeeId = :id")
+    suspend fun getFullNameById(id: String): String?
 }

@@ -11,6 +11,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -35,11 +36,25 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
-import androidx.navigation.compose.rememberNavController
 import coil.compose.rememberAsyncImagePainter
+import com.example.valentinesgarage.Data.DAO.NotesDao
+import com.example.valentinesgarage.Data.DAO.TasksDao
+import com.example.valentinesgarage.Data.DAO.TruckDao
+import com.example.valentinesgarage.Data.DAO.UserDao
+import com.example.valentinesgarage.Data.Entities.Notes
+import com.example.valentinesgarage.Data.Entities.Tasks
+import com.example.valentinesgarage.Data.Entities.Truck
+import com.example.valentinesgarage.Data.Entities.User
+import com.example.valentinesgarage.Screens.Employee.ViewModelFactory.CheckInViewModelFactory
+import com.example.valentinesgarage.Screens.Vehicles.TruckStatus
+import kotlinx.coroutines.launch
 import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
 
@@ -50,11 +65,17 @@ enum class VehicleCondition(val label: String, val filledSegments: Int) {
     POOR("Poor", 1)
 }
 
-// Represents a task typed in at check-in, assigned to a mechanic
+enum class TaskPriority(val label: String) {
+    HIGH("High"),
+    MEDIUM("Medium"),
+    LOW("Low")
+}
+
 data class AssignedTask(
     val id: String,
     val description: String,
-    val assignedTo: String   // mechanic name
+    val assignedTo: String,
+    val priority: TaskPriority = TaskPriority.MEDIUM
 )
 
 data class TruckCheckInForm(
@@ -64,40 +85,54 @@ data class TruckCheckInForm(
     val condition: VehicleCondition = VehicleCondition.GOOD,
     val photoUris: List<Uri> = emptyList(),
     val notes: String = "",
-    val assignedTasks: List<AssignedTask> = emptyList()  // ✅ new
+    val assignedTasks: List<AssignedTask> = emptyList()
 )
 
 // ─── ViewModel ────────────────────────────────────────────────────────────────
 
-class CheckInViewModel : ViewModel() {
+class CheckInViewModel(
+    private val truckDao: TruckDao,
+    private val notesDao: NotesDao,
+    private val tasksDao: TasksDao,
+    private val userDao: UserDao
+) : ViewModel() {
 
     var form by mutableStateOf(TruckCheckInForm())
         private set
 
-    // TODO: replace with a live list fetched from your mechanic database
-    val availableMechanics = listOf(
-        "David Mutanga",
-        "Aina Nghifindaka",
-        "Simon Shilongo",
-        "Petrus Hamutenya"
-    )
+    private var mechanicUsers by mutableStateOf<List<User>>(emptyList())
 
-    fun onLicencePlateChange(value: String) { form = form.copy(licencePlate = value) }
-    fun onDriverNameChange(value: String)   { form = form.copy(driverName = value) }
-    fun onOdometerChange(value: String)     { form = form.copy(odometer = value.filter { it.isDigit() }) }
-    fun onConditionChange(c: VehicleCondition) { form = form.copy(condition = c) }
-    fun onPhotosAdded(uris: List<Uri>)      { form = form.copy(photoUris = (form.photoUris + uris).take(5)) }
-    fun onPhotoTaken(uri: Uri)              { form = form.copy(photoUris = (form.photoUris + uri).take(5)) }
-    fun onNotesChange(value: String)        { form = form.copy(notes = value) }
+    val availableMechanics: List<String>
+        get() = mechanicUsers.map { "${it.firstName} ${it.lastName}" }
+
+    init {
+        loadMechanics()
+    }
+
+    private fun loadMechanics() {
+        viewModelScope.launch {
+            mechanicUsers = userDao.getUsersByRole("mechanic")
+        }
+    }
+
+    fun onLicencePlateChange(value: String)        { form = form.copy(licencePlate = value) }
+    fun onDriverNameChange(value: String)          { form = form.copy(driverName = value) }
+    fun onOdometerChange(value: String)            { form = form.copy(odometer = value.filter { it.isDigit() }) }
+    fun onConditionChange(c: VehicleCondition)     { form = form.copy(condition = c) }
+    fun onPhotosAdded(uris: List<Uri>)             { form = form.copy(photoUris = (form.photoUris + uris).take(5)) }
+    fun onPhotoTaken(uri: Uri)                     { form = form.copy(photoUris = (form.photoUris + uri).take(5)) }
+    fun onNotesChange(value: String)               { form = form.copy(notes = value) }
 
     // ── Task assignment ───────────────────────────────────────────────────────
 
-    fun addTask(description: String, mechanic: String) {
+
+    fun addTask(description: String, mechanic: String, priority: TaskPriority) {
         if (description.isBlank() || mechanic.isBlank()) return
         val task = AssignedTask(
-            id = "task_${System.currentTimeMillis()}",
+            id          = "task_${System.currentTimeMillis()}",
             description = description.trim(),
-            assignedTo = mechanic
+            assignedTo  = mechanic,
+            priority    = priority      // ← was referencing an undefined variable
         )
         form = form.copy(assignedTasks = form.assignedTasks + task)
     }
@@ -120,10 +155,48 @@ class CheckInViewModel : ViewModel() {
     // ── Submit ────────────────────────────────────────────────────────────────
 
     fun submitCheckIn(onSuccess: () -> Unit) {
-        // TODO: replace with Firebase Firestore or Room insert
-        // e.g. FirebaseFirestore.getInstance().collection("checkIns").add(form.toMap())
-        println("Check-in submitted: $form")
-        onSuccess()
+        if (!isFormValid()) return
+
+        viewModelScope.launch {
+            val truck = Truck(
+                licencePlate = form.licencePlate,
+                DriverName   = form.driverName,
+                Odmeter      = form.odometer.toIntOrNull() ?: 0,
+                Condition    = form.condition,
+                truckStatus = TruckStatus.WAITING,
+                photoUris    = form.photoUris.joinToString("|") { it.toString() },
+                checkInTime  = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
+            )
+            val newTruckId: Long = truckDao.insertTruck(truck)
+
+            if (form.notes.isNotBlank()) {
+                notesDao.insertNote(
+                    Notes(
+                        truckIdOwner = newTruckId.toInt(),
+                        noteText     = form.notes
+                    )
+                )
+            }
+
+            form.assignedTasks.forEach { assignedTask ->
+                val mechanic = mechanicUsers.firstOrNull { user ->
+                    "${user.firstName} ${user.lastName}" == assignedTask.assignedTo
+                }
+                if (mechanic != null) {
+                    tasksDao.insertTask(
+                        Tasks(
+                            description  = assignedTask.description,
+                            employeeIdFk = mechanic.employeeId,
+                            truckIdOwner = newTruckId.toInt(),
+                            status       = "Pending",
+                            priority     = assignedTask.priority.label
+                        )
+                    )
+                }
+            }
+
+            onSuccess()
+        }
     }
 
     fun isFormValid(): Boolean =
@@ -138,19 +211,27 @@ class CheckInViewModel : ViewModel() {
 @Composable
 fun TruckCheckInScreen(
     navController: NavController,
-    viewModel: CheckInViewModel = viewModel()
+    truckDao: TruckDao,
+    notesDao: NotesDao,
+    tasksDao: TasksDao,
+    userDao: UserDao
 ) {
-    val form = viewModel.form
-    val context = LocalContext.current
+    val viewModel: CheckInViewModel = viewModel(
+        factory = CheckInViewModelFactory(truckDao, notesDao, tasksDao, userDao)
+    )
 
-    // Camera state
-    var pendingCameraUri by remember { mutableStateOf<Uri?>(null) }
-    var showPhotoSheet   by remember { mutableStateOf(false) }
+    val form      = viewModel.form
+    val context   = LocalContext.current
+    val mechanics = viewModel.availableMechanics
 
-    // Task input state — local until added to form
+    var pendingCameraUri     by remember { mutableStateOf<Uri?>(null) }
+    var showPhotoSheet       by remember { mutableStateOf(false) }
     var taskInput            by remember { mutableStateOf("") }
-    var selectedMechanic     by remember { mutableStateOf(viewModel.availableMechanics.first()) }
+    var selectedMechanic     by remember(mechanics) { mutableStateOf(mechanics.firstOrNull() ?: "") }
     var mechanicDropdownOpen by remember { mutableStateOf(false) }
+
+
+    var selectedPriority     by remember { mutableStateOf(TaskPriority.MEDIUM) }
 
     val cameraLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.TakePicture()
@@ -163,15 +244,19 @@ fun TruckCheckInScreen(
         ActivityResultContracts.GetMultipleContents()
     ) { uris -> viewModel.onPhotosAdded(uris) }
 
-    // Photo source bottom sheet
+    // ── Photo source bottom sheet ─────────────────────────────────────────────
     if (showPhotoSheet) {
         ModalBottomSheet(onDismissRequest = { showPhotoSheet = false }) {
             Column(modifier = Modifier.padding(16.dp)) {
-                Text("Add photo", fontWeight = FontWeight.Medium, fontSize = 16.sp,
-                    modifier = Modifier.padding(bottom = 12.dp))
+                Text(
+                    "Add photo",
+                    fontWeight = FontWeight.Medium,
+                    fontSize   = 16.sp,
+                    modifier   = Modifier.padding(bottom = 12.dp)
+                )
                 ListItem(
                     headlineContent = { Text("Take a photo") },
-                    leadingContent = { Icon(Icons.Outlined.CameraAlt, null) },
+                    leadingContent  = { Icon(Icons.Outlined.CameraAlt, null) },
                     modifier = Modifier.clickable {
                         showPhotoSheet = false
                         val uri = viewModel.createCameraUri(context)
@@ -181,7 +266,7 @@ fun TruckCheckInScreen(
                 )
                 ListItem(
                     headlineContent = { Text("Choose from gallery") },
-                    leadingContent = { Icon(Icons.Outlined.PhotoLibrary, null) },
+                    leadingContent  = { Icon(Icons.Outlined.PhotoLibrary, null) },
                     modifier = Modifier.clickable {
                         showPhotoSheet = false
                         galleryLauncher.launch("image/*")
@@ -214,42 +299,42 @@ fun TruckCheckInScreen(
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
 
-            // ── Vehicle info ──────────────────────────────────────────────
+            // ── Vehicle info ──────────────────────────────────────────────────
             FormSectionLabel("Vehicle info")
 
             FieldLabel("Licence plate")
             OutlinedTextField(
-                value = form.licencePlate,
+                value         = form.licencePlate,
                 onValueChange = viewModel::onLicencePlateChange,
-                placeholder = { Text("e.g. N 12345 W") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(10.dp)
+                placeholder   = { Text("e.g. N 12345 W") },
+                singleLine    = true,
+                modifier      = Modifier.fillMaxWidth(),
+                shape         = RoundedCornerShape(10.dp)
             )
 
             Spacer(Modifier.height(8.dp))
 
             FieldLabel("Driver name")
             OutlinedTextField(
-                value = form.driverName,
+                value         = form.driverName,
                 onValueChange = viewModel::onDriverNameChange,
-                placeholder = { Text("Full name") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(10.dp)
+                placeholder   = { Text("Full name") },
+                singleLine    = true,
+                modifier      = Modifier.fillMaxWidth(),
+                shape         = RoundedCornerShape(10.dp)
             )
 
             Spacer(Modifier.height(8.dp))
 
             FieldLabel("Odometer (km)")
             OutlinedTextField(
-                value = form.odometer,
-                onValueChange = viewModel::onOdometerChange,
-                placeholder = { Text("e.g. 148302") },
-                singleLine = true,
+                value           = form.odometer,
+                onValueChange   = viewModel::onOdometerChange,
+                placeholder     = { Text("e.g. 148302") },
+                singleLine      = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(10.dp)
+                modifier        = Modifier.fillMaxWidth(),
+                shape           = RoundedCornerShape(10.dp)
             )
 
             Spacer(Modifier.height(8.dp))
@@ -264,7 +349,7 @@ fun TruckCheckInScreen(
 
             FieldLabel("Photos (up to 5)")
             PhotoPicker(
-                uris = form.photoUris,
+                uris        = form.photoUris,
                 onAddPhotos = { showPhotoSheet = true }
             )
 
@@ -272,46 +357,47 @@ fun TruckCheckInScreen(
 
             FieldLabel("Notes / damage description")
             OutlinedTextField(
-                value = form.notes,
+                value         = form.notes,
                 onValueChange = viewModel::onNotesChange,
-                placeholder = { Text("Describe any scratches, damage, etc.") },
-                minLines = 3,
-                maxLines = 5,
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(10.dp)
+                placeholder   = { Text("Describe any scratches, damage, etc.") },
+                minLines      = 3,
+                maxLines      = 5,
+                modifier      = Modifier.fillMaxWidth(),
+                shape         = RoundedCornerShape(10.dp)
             )
 
-            // ── Task assignment ───────────────────────────────────────────
+            // ── Task assignment ───────────────────────────────────────────────
             Spacer(Modifier.height(16.dp))
             HorizontalDivider(thickness = 0.5.dp)
             Spacer(Modifier.height(12.dp))
 
             FormSectionLabel("Assign tasks")
 
-            // Task description input + Add button
             FieldLabel("Task description")
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier              = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment     = Alignment.CenterVertically
             ) {
                 OutlinedTextField(
-                    value = taskInput,
+                    value         = taskInput,
                     onValueChange = { taskInput = it },
-                    placeholder = { Text("e.g. Oil & filter change") },
-                    singleLine = true,
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(10.dp)
+                    placeholder   = { Text("e.g. Oil & filter change") },
+                    singleLine    = true,
+                    modifier      = Modifier.weight(1f),
+                    shape         = RoundedCornerShape(10.dp)
                 )
                 Button(
                     onClick = {
-                        viewModel.addTask(taskInput, selectedMechanic)
-                        taskInput = "" // clear after adding
+
+                        viewModel.addTask(taskInput, selectedMechanic, selectedPriority)
+                        taskInput        = ""
+                        selectedPriority = TaskPriority.MEDIUM  // reset after adding
                     },
-                    enabled = taskInput.isNotBlank(),
-                    shape = RoundedCornerShape(10.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFF1A1A1A),
+                    enabled        = taskInput.isNotBlank() && selectedMechanic.isNotBlank(),
+                    shape          = RoundedCornerShape(10.dp),
+                    colors         = ButtonDefaults.buttonColors(
+                        containerColor         = Color(0xFF1A1A1A),
                         disabledContainerColor = Color(0xFFCCCCCC)
                     ),
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp)
@@ -322,17 +408,44 @@ fun TruckCheckInScreen(
 
             Spacer(Modifier.height(8.dp))
 
-            // Mechanic dropdown
+            // ── Priority picker ───────────────────────────────────────────────
+            FieldLabel("Priority")
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TaskPriority.entries.forEach { priority ->
+                    val isSelected    = priority == selectedPriority
+                    val priorityColor = when (priority) {
+                        TaskPriority.HIGH   -> Color(0xFFD32F2F)
+                        TaskPriority.MEDIUM -> Color(0xFFF57C00)
+                        TaskPriority.LOW    -> Color(0xFF388E3C)
+                    }
+                    Surface(
+                        onClick = { selectedPriority = priority },
+                        shape   = RoundedCornerShape(20.dp),
+                        color   = if (isSelected) priorityColor else Color.Transparent,
+                        border  = BorderStroke(0.5.dp, if (isSelected) priorityColor else Color.LightGray)
+                    ) {
+                        Text(
+                            text     = priority.label,
+                            fontSize = 12.sp,
+                            color    = if (isSelected) Color.White else Color.Gray,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                        )
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(8.dp))
+
             FieldLabel("Assign to mechanic")
             ExposedDropdownMenuBox(
-                expanded = mechanicDropdownOpen,
-                onExpandedChange = { mechanicDropdownOpen = it }
+                expanded         = mechanicDropdownOpen && mechanics.isNotEmpty(),
+                onExpandedChange = { if (mechanics.isNotEmpty()) mechanicDropdownOpen = it }
             ) {
                 OutlinedTextField(
-                    value = selectedMechanic,
+                    value         = if (mechanics.isEmpty()) "Loading…" else selectedMechanic,
                     onValueChange = {},
-                    readOnly = true,
-                    trailingIcon = {
+                    readOnly      = true,
+                    trailingIcon  = {
                         ExposedDropdownMenuDefaults.TrailingIcon(expanded = mechanicDropdownOpen)
                     },
                     modifier = Modifier
@@ -341,14 +454,14 @@ fun TruckCheckInScreen(
                     shape = RoundedCornerShape(10.dp)
                 )
                 ExposedDropdownMenu(
-                    expanded = mechanicDropdownOpen,
+                    expanded         = mechanicDropdownOpen && mechanics.isNotEmpty(),
                     onDismissRequest = { mechanicDropdownOpen = false }
                 ) {
-                    viewModel.availableMechanics.forEach { mechanic ->
+                    mechanics.forEach { mechanic ->
                         DropdownMenuItem(
-                            text = { Text(mechanic) },
+                            text    = { Text(mechanic) },
                             onClick = {
-                                selectedMechanic = mechanic
+                                selectedMechanic     = mechanic
                                 mechanicDropdownOpen = false
                             }
                         )
@@ -358,29 +471,22 @@ fun TruckCheckInScreen(
 
             Spacer(Modifier.height(12.dp))
 
-            // Task list
+            // ── Task list ─────────────────────────────────────────────────────
             if (form.assignedTasks.isEmpty()) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .border(
-                            BorderStroke(0.5.dp, Color.LightGray),
-                            RoundedCornerShape(10.dp)
-                        )
+                        .border(BorderStroke(0.5.dp, Color.LightGray), RoundedCornerShape(10.dp))
                         .padding(vertical = 16.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        "No tasks added yet",
-                        fontSize = 12.sp,
-                        color = Color.LightGray
-                    )
+                    Text("No tasks added yet", fontSize = 12.sp, color = Color.LightGray)
                 }
             } else {
                 FieldLabel("Tasks added (${form.assignedTasks.size})")
                 form.assignedTasks.forEach { task ->
                     AssignedTaskChip(
-                        task = task,
+                        task     = task,
                         onRemove = { viewModel.removeTask(task.id) }
                     )
                     Spacer(Modifier.height(6.dp))
@@ -389,20 +495,18 @@ fun TruckCheckInScreen(
 
             Spacer(Modifier.height(20.dp))
 
-            // ── Submit ────────────────────────────────────────────────────
+            // ── Submit ────────────────────────────────────────────────────────
             Button(
                 onClick = {
-                    viewModel.submitCheckIn {
-                        navController.popBackStack()
-                    }
+                    viewModel.submitCheckIn { navController.popBackStack() }
                 },
-                enabled = viewModel.isFormValid(),
+                enabled  = viewModel.isFormValid(),
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(52.dp),
-                shape = RoundedCornerShape(12.dp),
+                shape  = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFF1A1A1A),
+                    containerColor         = Color(0xFF1A1A1A),
                     disabledContainerColor = Color(0xFFCCCCCC)
                 )
             ) {
@@ -421,42 +525,67 @@ fun AssignedTaskChip(
     task: AssignedTask,
     onRemove: () -> Unit
 ) {
+    val priorityColor = when (task.priority) {
+        TaskPriority.HIGH   -> Color(0xFFD32F2F)
+        TaskPriority.MEDIUM -> Color(0xFFF57C00)
+        TaskPriority.LOW    -> Color(0xFF388E3C)
+    }
+
     Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(10.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        modifier  = Modifier.fillMaxWidth(),
+        shape     = RoundedCornerShape(10.dp),
+        colors    = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
         Row(
-            modifier = Modifier
+            modifier              = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 12.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
+            verticalAlignment     = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = task.description,
-                    fontSize = 13.sp,
+                    text       = task.description,
+                    fontSize   = 13.sp,
                     fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color      = MaterialTheme.colorScheme.onSurface
                 )
                 Spacer(Modifier.height(2.dp))
                 Text(
-                    text = "→ ${task.assignedTo}",
+                    text  = "→ ${task.assignedTo}",
                     fontSize = 11.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                Spacer(Modifier.height(4.dp))
+
+                Row(
+                    verticalAlignment     = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(6.dp)
+                            .clip(CircleShape)
+                            .background(priorityColor)
+                    )
+                    Text(
+                        text       = task.priority.label,
+                        fontSize   = 11.sp,
+                        color      = priorityColor,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
             }
             IconButton(
-                onClick = onRemove,
+                onClick  = onRemove,
                 modifier = Modifier.size(32.dp)
             ) {
                 Icon(
-                    imageVector = Icons.Default.Close,
+                    imageVector        = Icons.Default.Close,
                     contentDescription = "Remove task",
-                    tint = Color.LightGray,
-                    modifier = Modifier.size(16.dp)
+                    tint               = Color.LightGray,
+                    modifier           = Modifier.size(16.dp)
                 )
             }
         }
@@ -468,25 +597,25 @@ fun AssignedTaskChip(
 @Composable
 fun FormSectionLabel(text: String) {
     Text(
-        text = text.uppercase(),
-        fontSize = 10.sp,
-        fontWeight = FontWeight.Medium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        text          = text.uppercase(),
+        fontSize      = 10.sp,
+        fontWeight    = FontWeight.Medium,
+        color         = MaterialTheme.colorScheme.onSurfaceVariant,
         letterSpacing = 0.8.sp,
-        modifier = Modifier.padding(bottom = 8.dp)
+        modifier      = Modifier.padding(bottom = 8.dp)
     )
 }
 
-// ─── Reusable components (unchanged) ─────────────────────────────────────────
+// ─── Reusable components ──────────────────────────────────────────────────────
 
 @Composable
 fun FieldLabel(text: String) {
     Text(
-        text = text,
-        fontSize = 12.sp,
+        text       = text,
+        fontSize   = 12.sp,
         fontWeight = FontWeight.Medium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(bottom = 4.dp)
+        color      = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier   = Modifier.padding(bottom = 4.dp)
     )
 }
 
@@ -501,15 +630,17 @@ fun ConditionSelector(
                 val isSelected = condition == selected
                 Surface(
                     onClick = { onSelect(condition) },
-                    shape = RoundedCornerShape(20.dp),
-                    color = if (isSelected) Color(0xFF1A1A1A) else Color.Transparent,
-                    border = BorderStroke(0.5.dp,
-                        if (isSelected) Color(0xFF1A1A1A) else Color.LightGray)
+                    shape   = RoundedCornerShape(20.dp),
+                    color   = if (isSelected) Color(0xFF1A1A1A) else Color.Transparent,
+                    border  = BorderStroke(
+                        0.5.dp,
+                        if (isSelected) Color(0xFF1A1A1A) else Color.LightGray
+                    )
                 ) {
                     Text(
-                        text = condition.label,
+                        text     = condition.label,
                         fontSize = 12.sp,
-                        color = if (isSelected) Color.White else Color.Gray,
+                        color    = if (isSelected) Color.White else Color.Gray,
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
                     )
                 }
@@ -517,7 +648,7 @@ fun ConditionSelector(
         }
         Spacer(Modifier.height(8.dp))
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier              = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             repeat(4) { index ->
@@ -544,10 +675,10 @@ fun PhotoPicker(
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         uris.forEach { uri ->
             Image(
-                painter = rememberAsyncImagePainter(uri),
+                painter            = rememberAsyncImagePainter(uri),
                 contentDescription = "Vehicle photo",
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
+                contentScale       = ContentScale.Crop,
+                modifier           = Modifier
                     .size(72.dp)
                     .clip(RoundedCornerShape(8.dp))
                     .border(0.5.dp, Color.LightGray, RoundedCornerShape(8.dp))
@@ -563,8 +694,12 @@ fun PhotoPicker(
                     .clickable { onAddPhotos() },
                 contentAlignment = Alignment.Center
             ) {
-                Icon(Icons.Default.Add, contentDescription = "Add photo",
-                    tint = Color.Gray, modifier = Modifier.size(24.dp))
+                Icon(
+                    Icons.Default.Add,
+                    contentDescription = "Add photo",
+                    tint               = Color.Gray,
+                    modifier           = Modifier.size(24.dp)
+                )
             }
         }
     }
@@ -575,5 +710,5 @@ fun PhotoPicker(
 @Preview(showBackground = true)
 @Composable
 fun TruckCheckInPreview() {
-    TruckCheckInScreen(navController = rememberNavController())
+
 }

@@ -4,13 +4,9 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.lifecycle.ViewModelProvider
 import com.example.valentinesgarage.AppNavigation.AppNavigation
 import com.example.valentinesgarage.Data.Database.AppDatabase
-import com.example.valentinesgarage.Screens.CheckIn.CheckInViewModel
-import com.example.valentinesgarage.Screens.Mechanic.MechanicViewModel
-import com.example.valentinesgarage.Screens.Vehicles.ActiveVehiclesViewModel
-import kotlin.jvm.java
+
 
 
 class MainActivity : ComponentActivity() {
@@ -19,15 +15,13 @@ class MainActivity : ComponentActivity() {
 
         val database = AppDatabase.getDatabase(this)
         val userDao = database.userDao()
-
-        val mechanicViewModel = ViewModelProvider(this)[MechanicViewModel::class.java]
-        val activeVehiclesViewModel = ViewModelProvider(this)[ActiveVehiclesViewModel::class.java]
-        val checkInViewModel = ViewModelProvider(this)[CheckInViewModel::class.java]
-
+        val truckDao = database.TruckDao()
+        val noteDao = database.NotesDao()
+        val taskDao = database.TasksDao()
 
         enableEdgeToEdge()
         setContent {
-            AppNavigation(mechanicViewModel, activeVehiclesViewModel, checkInViewModel,userDao = userDao)
+            AppNavigation(userDao = userDao, truckDao = truckDao, noteDao = noteDao, taskDao =taskDao)
         }
     }
 }

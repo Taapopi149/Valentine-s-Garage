@@ -9,17 +9,17 @@ import androidx.room.PrimaryKey
     foreignKeys =  [
         ForeignKey(
             entity = Truck::class,
-            parentColumns = ["licencePlate"],
-            childColumns = ["truckId"],
+            parentColumns = ["truckId"],
+            childColumns = ["truckIdOwner"],
             onDelete = ForeignKey.CASCADE
         )
     ],
-    indices = [Index("truckId")]
+    indices = [Index("truckIdOwner")]
 )
 
 
 data class Notes (
     @PrimaryKey(autoGenerate = true) val noteId: Int = 0,
-    val truckId: String,
+    val truckIdOwner: Int,
     val noteText: String
 )

@@ -25,6 +25,7 @@ import androidx.navigation.NavController
 import com.example.valentinesgarage.Data.DAO.UserDao
 import com.example.valentinesgarage.Data.Entities.User
 import com.example.valentinesgarage.PassWordHashing.PasswordUtils
+import com.example.valentinesgarage.SessionManager
 import kotlinx.coroutines.launch
 
 //---------------------------------- Login ViewModel
@@ -87,6 +88,10 @@ fun Login(navController: NavController, userDao: UserDao) {
     // Navigation based on role
     LaunchedEffect(user) {
         if (user != null) {
+
+            // Session Manager Getting currentUser
+            SessionManager.login(user)
+
             when (user.role.lowercase()) {
                 "manager" -> {
                     navController.navigate("ManagerHome") {

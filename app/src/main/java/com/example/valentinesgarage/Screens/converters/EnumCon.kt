@@ -1,4 +1,4 @@
-package com.example.valentinesgarage.Screens.Converters
+package com.example.valentinesgarage.Screens.converters
 
 import androidx.room.TypeConverter
 import com.example.valentinesgarage.Screens.CheckIn.VehicleCondition

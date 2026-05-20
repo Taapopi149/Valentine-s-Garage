@@ -249,7 +249,7 @@ fun AddEmployeeScreen(navController: NavController, userDao: UserDao) {
             FormField(
                 value         = email,
                 onValueChange = { email = it; emailError = false },
-                label         = "Email Address *",
+                label         = "Email Address",
                 placeholder   = "e.g. alice@company.com",
                 isError       = emailError,
                 errorMessage  = "Enter a valid email address",
@@ -390,11 +390,38 @@ fun AddEmployeeScreen(navController: NavController, userDao: UserDao) {
                 textStyle = LocalTextStyle.current.copy(fontFamily = FontFamily.Monospace, fontWeight = FontWeight.SemiBold)
             )
 
+            // Password strength hint
+            Surface(
+                color  = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
+                shape  = RoundedCornerShape(8.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier          = Modifier.padding(12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector        = Icons.Default.Info,
+                        contentDescription = null,
+                        tint               = MaterialTheme.colorScheme.primary,
+                        modifier           = Modifier.size(16.dp)
+                    )
+                    Text(
+                        text  = "Password includes uppercase, lowercase, numbers and special characters. Hit refresh to regenerate.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            HorizontalDivider()
+
             Button(
                 onClick = {
                     firstNameError = first_Name.isBlank()
                     lastNameError  = last_Name.isBlank()
-                    emailError     = email.isBlank() || !email.contains("@")
+                    emailError     = email.isNotBlank() && !email.contains("@")
                     roleError      = role.isBlank()
 
                     if (!firstNameError && !lastNameError && !emailError && !roleError) {

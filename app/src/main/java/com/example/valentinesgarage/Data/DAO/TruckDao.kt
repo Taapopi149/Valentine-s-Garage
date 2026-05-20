@@ -17,6 +17,13 @@ interface  TruckDao {
     @Query("SELECT * FROM Truck")
     fun getAllTruck(): Flow<List<Truck>>
 
+
+    @Query("SELECT * FROM Truck ORDER BY truckId DESC")
+    fun getAllTrucks(): Flow<List<Truck>>
+
+    @Query("SELECT noteText FROM Notes WHERE truckIdOwner = :truckId LIMIT 1")
+    suspend fun getNoteForTruck(truckId: Int): String?
+
     @Query("SELECT COUNT(*) FROM Tasks WHERE truckIdOwner = :truckId")
     suspend fun getTaskCountForTruck(truckId: Int): Int
 
@@ -41,6 +48,10 @@ interface  TruckDao {
 
     @Query("SELECT COUNT(*) FROM Truck")
     fun getTruckCount(): Flow<Int>
+
+    @Query("SELECT * FROM Truck WHERE truckId = :truckId")
+    fun getTruckById(truckId: Int): Flow<Truck?>
+
 
 
 

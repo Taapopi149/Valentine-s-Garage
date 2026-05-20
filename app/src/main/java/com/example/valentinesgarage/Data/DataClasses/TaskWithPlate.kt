@@ -13,3 +13,15 @@ data class TaskWithPlate(
     val truckIdOwner: Int,
     val licencePlate: String
 )
+
+data class TaskEmployeeEntry(
+    val employeeIdFk: String,
+    val description:  String,
+    val status:       String,
+    val truckIdOwner: Int
+)
+
+data class TaskLabelCount(
+    val taskLabel:  String,
+    val truckCount: Int
+)

@@ -82,12 +82,15 @@ fun AppNavigation(
             val truckId = backStackEntry.arguments?.getString("truckId")?.toIntOrNull() ?: return@composable
             TruckDetailScreen(
                 navController = navController,
-                truckId = truckId
+                truckId = truckId,
+                truckDao,
+                taskDao,
+                noteDao
             )
         }
 
         composable ("Profile"){ EmployeeProfilePage(navController, userDao, taskDao) }
-       composable("Report") { ReportsScreen(navController) }
+       composable("Report") { ReportsScreen(navController,taskDao, truckDao, userDao, noteDao ) }
 
     }
 

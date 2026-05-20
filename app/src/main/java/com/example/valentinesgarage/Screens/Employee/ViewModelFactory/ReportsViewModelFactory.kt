@@ -2,25 +2,29 @@ package com.example.valentinesgarage.Screens.Employee.ViewModelFactory
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import com.example.valentinesgarage.Data.DAO.NotesDao
 import com.example.valentinesgarage.Data.DAO.TasksDao
 import com.example.valentinesgarage.Data.DAO.TruckDao
-import com.example.valentinesgarage.Screens.Employee.EmployeeHomeViewModel
+import com.example.valentinesgarage.Data.DAO.UserDao
+import com.example.valentinesgarage.Screens.Manager.ReportsViewModel
 
 
-class EmployeeHomeViewModelFactory(
+class ReportsViewModelFactory(
     private val tasksDao: TasksDao,
     private val truckDao: TruckDao,
-    private val employeeId: String
+    private val userDao: UserDao,
+    private val notesDao: NotesDao
 
 ) : ViewModelProvider.Factory {
 
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
-        if (modelClass.isAssignableFrom(EmployeeHomeViewModel::class.java)) {
+        if (modelClass.isAssignableFrom(ReportsViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
-            return EmployeeHomeViewModel(
+            return ReportsViewModel(
                 tasksDao,
                 truckDao,
-                employeeId
+                userDao,
+                notesDao
             ) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")

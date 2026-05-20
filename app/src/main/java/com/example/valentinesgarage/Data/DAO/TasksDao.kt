@@ -4,6 +4,8 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import com.example.valentinesgarage.Data.DataClasses.TaskEmployeeEntry
+import com.example.valentinesgarage.Data.DataClasses.TaskLabelCount
 import com.example.valentinesgarage.Data.DataClasses.TaskWithPlate
 import com.example.valentinesgarage.Data.Entities.Tasks
 import kotlinx.coroutines.flow.Flow
@@ -58,5 +60,38 @@ interface TasksDao {
     WHERE employeeIdFk = :employeeId AND status = :status
 """)
     suspend fun getTaskCountByStatus(employeeId: String, status: String): Int
+
+    @Query("SELECT COUNT(*) FROM Tasks WHERE status = 'Done'")
+    fun getCompletedTaskCount(): Flow<Int>
+
+    @Query("SELECT COUNT(*) FROM Tasks WHERE status = 'Pending'")
+    fun getPendingTaskCount(): Flow<Int>
+
+    @Query("""
+    SELECT Tasks.employeeIdFk, Tasks.description, Tasks.status, Tasks.truckIdOwner
+    FROM Tasks
+""")
+    fun getAllTasksWithEmployee(): Flow<List<TaskEmployeeEntry>>
+
+    @Query("""
+    SELECT Tasks.description as taskLabel, COUNT(DISTINCT Tasks.truckIdOwner) as truckCount
+    FROM Tasks
+    WHERE Tasks.employeeIdFk = :employeeId
+    GROUP BY Tasks.description
+""")
+    suspend fun getTaskSummaryForEmployee(employeeId: String): List<TaskLabelCount>
+
+
+    @Query("""
+    SELECT Notes.noteText FROM Notes
+    INNER JOIN Truck ON Notes.truckIdOwner = Truck.truckId
+    INNER JOIN Tasks ON Tasks.truckIdOwner = Truck.truckId
+    WHERE Tasks.employeeIdFk = :employeeId
+    LIMIT 1
+""")
+    suspend fun getLatestNoteForEmployee(employeeId: String): String?
+
+    @Query("SELECT COUNT(*) FROM Tasks WHERE employeeIdFk = :employeeId")
+    suspend fun getTotalTasksForEmployee(employeeId: String): Int
 
 }

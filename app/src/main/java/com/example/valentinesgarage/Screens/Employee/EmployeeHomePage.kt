@@ -153,7 +153,7 @@ fun EmployeeHomePage(
     val employeeId = SessionManager.currentUserId ?: ""
 
     val viewModel: EmployeeHomeViewModel = viewModel(
-        factory = EmployeeHomeViewModelFactory(truckDao, tasksDao, employeeId)
+        factory = EmployeeHomeViewModelFactory(tasksDao, truckDao, employeeId)
     )
 
     // FIX 5: collect the StateFlows so the UI actually reacts to DB changes

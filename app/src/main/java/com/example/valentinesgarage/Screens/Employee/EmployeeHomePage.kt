@@ -9,12 +9,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AccountCircle
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Build
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.DirectionsCar
-import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.automirrored.filled.ExitToApp
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.material3.CardDefaults.cardElevation
 import androidx.compose.runtime.Composable
@@ -80,22 +76,28 @@ fun EmployeeHomePage(navController: NavController) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Employee Dashboard") },
+                title = { Text("Employee Dashboard", fontWeight = FontWeight.Bold) },
                 actions = {
-                    IconButton(
-                        onClick = {navController.navigate("Profile")}
-
-                    ) {
+                    IconButton(onClick = {
+                        navController.navigate("Login") {
+                            popUpTo(0) { inclusive = true }
+                        }
+                    }) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ExitToApp,
+                            contentDescription = "Logout",
+                            tint = MaterialTheme.colorScheme.error
+                        )
+                    }
+                    IconButton(onClick = { navController.navigate("Profile") }) {
                         Icon(
                             imageVector = Icons.Default.AccountCircle,
                             contentDescription = "Profile",
-                            modifier = Modifier.size(50.dp)
+                            modifier = Modifier.size(32.dp)
                         )
                     }
                 }
             )
-
-
         }
     ) { padding ->
 

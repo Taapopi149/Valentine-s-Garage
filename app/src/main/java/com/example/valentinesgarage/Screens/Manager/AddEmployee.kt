@@ -13,7 +13,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalClipboardManager
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -21,14 +20,12 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
-import androidx.navigation.compose.rememberNavController
 import com.example.valentinesgarage.Data.DAO.UserDao
 import com.example.valentinesgarage.PassWordHashing.PasswordUtils
 import com.example.valentinesgarage.Screens.Manager.ViewFactory.AddEmployeeViewModelFactory
@@ -38,12 +35,6 @@ import kotlinx.coroutines.withContext
 import java.time.LocalDate
 
 // ─── Helper Functions ──────────────────────────────────────────────────────────
-
-//fun generateEmployeeId(): String {
-//    val number = Random.nextInt(1000, 9999)
-//    return "EMP-$number"
-//}
-
 
 private fun buildNextEmployeeId(lastId: String?): String {
     if (lastId == null) return "EMP001"
@@ -62,7 +53,6 @@ fun generatePassword(): String {
     val digits  = ('0'..'9').toList()
     val special = listOf('!', '@', '#', '$', '%', '&')
 
-    // Guarantee at least one of each character type
     val required = listOf(
         upper.random(),
         upper.random(),
@@ -74,11 +64,9 @@ fun generatePassword(): String {
         special.random(),
     )
 
-    // Fill remaining characters from all pools combined
     val allChars = upper + lower + digits + special
     val extra    = (1..(12 - required.size)).map { allChars.random() }
 
-    // Shuffle so required chars aren't always at the front
     return (required + extra).shuffled().joinToString("")
 }
 
@@ -86,13 +74,12 @@ fun generatePassword(): String {
 
 class AddEmployeeViewModel(private val userDao: UserDao) : ViewModel() {
 
-
     var generatedEmployeeId by mutableStateOf("")
         private set
 
     init {
         viewModelScope.launch(Dispatchers.IO) {
-            val lastId = userDao.getLastEmployeeIdOnly()   // e.g. "MG003" or null
+            val lastId = userDao.getLastEmployeeIdOnly()
             val nextId = buildNextEmployeeId(lastId)
             withContext(Dispatchers.Main) {
                 generatedEmployeeId = nextId
@@ -113,36 +100,33 @@ class AddEmployeeViewModel(private val userDao: UserDao) : ViewModel() {
         onSuccess: () -> Unit,
         onError: (String) -> Unit
     ) {
-
-        val hashedPassword = PasswordUtils.hashPassword(password)
-
-
         viewModelScope.launch (Dispatchers.IO) {
-            val joinDateString: String = LocalDate.now().toString()
-            val employeeUser = com.example.valentinesgarage.Data.Entities.User(
-                employeeId    = employeeId,
-                firstName     = firstName,
-                lastName      = lastName,
-                role          = role,
-                email         = email,
-                shift         = shift,
-                phone         = phone,
-                joinDate      = joinDateString,
-                taskCompleted = null,
-                tasksPending  = null,
-                taskProgress  = null,
-                password      = hashedPassword,
-                department = department
-            )
-            userDao.insertUser(employeeUser)
-            withContext(Dispatchers.Main) {onSuccess()}
+            try {
+                val hashedPassword = PasswordUtils.hashPassword(password)
+                val joinDateString: String = LocalDate.now().toString()
+                val employeeUser = com.example.valentinesgarage.Data.Entities.User(
+                    employeeId    = employeeId,
+                    firstName     = firstName,
+                    lastName      = lastName,
+                    role          = role.trim().lowercase(),
+                    email         = email,
+                    shift         = shift,
+                    phone         = phone,
+                    joinDate      = joinDateString,
+                    taskCompleted = 0,
+                    tasksPending  = 0,
+                    taskProgress  = 0,
+                    password      = hashedPassword,
+                    department = department
+                )
+                userDao.insertUser(employeeUser)
+                withContext(Dispatchers.Main) { onSuccess() }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) { onError(e.message ?: "Unknown error") }
+            }
         }
     }
-
-
 }
-
-
 
 // ─── Add Employee Screen ───────────────────────────────────────────────────────
 
@@ -158,23 +142,18 @@ fun AddEmployeeScreen(navController: NavController, userDao: UserDao) {
 
     // Form state
     var first_Name   by remember { mutableStateOf("") }
-    var last_Name   by remember { mutableStateOf("") }
-    var email      by remember { mutableStateOf("") }
-    var phone      by remember { mutableStateOf("") }
-    var role       by remember { mutableStateOf("") }
-    var department by remember { mutableStateOf("") }
-     var shift     by remember { mutableStateOf("") }
+    var last_Name    by remember { mutableStateOf("") }
+    var email        by remember { mutableStateOf("") }
+    var phone        by remember { mutableStateOf("") }
+    var role         by remember { mutableStateOf("") }
+    var department   by remember { mutableStateOf("") }
+    var shift        by remember { mutableStateOf("") }
 
-
-
-    // Generated credentials — created once when the screen opens
     var employeeId       by remember { mutableStateOf("Generating...") }
     var generatedPassword by remember { mutableStateOf(generatePassword()) }
-    var passwordVisible  by remember { mutableStateOf(false) }
-    var idCopied         by remember { mutableStateOf(false) }
-    var pwCopied         by remember { mutableStateOf(false) }
-
-    // Once the ViewModel finishes the DB lookup, sync the ID into local state
+    var passwordVisible   by remember { mutableStateOf(false) }
+    var idCopied          by remember { mutableStateOf(false) }
+    var pwCopied          by remember { mutableStateOf(false) }
 
     LaunchedEffect(viewModel.generatedEmployeeId) {
         if (viewModel.generatedEmployeeId.isNotEmpty()) {
@@ -182,23 +161,20 @@ fun AddEmployeeScreen(navController: NavController, userDao: UserDao) {
         }
     }
 
-    // Dropdown state
     var deptExpanded by remember { mutableStateOf(false) }
-    val departments  = listOf("Engineering", "HR")
+    val departments  = listOf("Engineering", "HR", "Maintenance", "Reception")
 
-    // Role
-    val roleDrop = listOf("receptionist ", "mechanic")
+    val roleDrop = listOf("receptionist", "mechanic")
     var roleExpanded by remember { mutableStateOf(false) }
 
     // Validation errors
-    var nameError  by remember { mutableStateOf(false) }
-    var emailError by remember { mutableStateOf(false) }
-    var roleError  by remember { mutableStateOf(false) }
+    var firstNameError by remember { mutableStateOf(false) }
+    var lastNameError  by remember { mutableStateOf(false) }
+    var emailError     by remember { mutableStateOf(false) }
+    var roleError      by remember { mutableStateOf(false) }
 
-    // Success dialog
     var showSuccess by remember { mutableStateOf(false) }
 
-    // ── Success Dialog ──────────────────────────────────────────────────────
     if (showSuccess) {
         AlertDialog(
             onDismissRequest = {},
@@ -206,7 +182,7 @@ fun AddEmployeeScreen(navController: NavController, userDao: UserDao) {
             title = { Text("Employee Added!") },
             text  = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("${first_Name} ${last_Name}  has been successfully added.")
+                    Text("$first_Name $last_Name has been successfully added.")
                     HorizontalDivider()
                     CredentialRow(label = "Employee ID", value = employeeId)
                     CredentialRow(label = "Password",    value = generatedPassword)
@@ -225,27 +201,15 @@ fun AddEmployeeScreen(navController: NavController, userDao: UserDao) {
         )
     }
 
-    // ── Scaffold ────────────────────────────────────────────────────────────
     Scaffold(
         topBar = {
             TopAppBar(
-                title = {
-                    Text(
-                        text       = "Add Employee",
-                        fontWeight = FontWeight.SemiBold
-                    )
-                },
+                title = { Text("Add Employee", fontWeight = FontWeight.SemiBold) },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(
-                            imageVector        = Icons.Default.ArrowBack,
-                            contentDescription = "Back"
-                        )
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
                     }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                )
+                }
             )
         }
     ) { innerPadding ->
@@ -259,30 +223,28 @@ fun AddEmployeeScreen(navController: NavController, userDao: UserDao) {
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
 
-            // ── Section: Personal Info ──────────────────────────────────────
             SectionHeader(title = "Personal Information", icon = Icons.Default.Person)
 
             FormField(
                 value         = first_Name,
-                onValueChange = { first_Name = it; nameError = false },
+                onValueChange = { first_Name = it; firstNameError = false },
                 label         = "First Name *",
                 placeholder   = "e.g. Alice",
-                isError       = nameError,
-                errorMessage  = "Full name is required",
+                isError       = firstNameError,
+                errorMessage  = "First name is required",
                 leadingIcon   = Icons.Default.Person,
                 keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words)
             )
             FormField(
                 value         = last_Name,
-                onValueChange = { last_Name = it; nameError = false },
+                onValueChange = { last_Name = it; lastNameError = false },
                 label         = "Last Name *",
                 placeholder   = "e.g. Johnson",
-                isError       = nameError,
-                errorMessage  = "Full name is required",
+                isError       = lastNameError,
+                errorMessage  = "Last name is required",
                 leadingIcon   = Icons.Default.Person,
                 keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words)
             )
-
 
             FormField(
                 value         = email,
@@ -306,42 +268,34 @@ fun AddEmployeeScreen(navController: NavController, userDao: UserDao) {
 
             HorizontalDivider()
 
-            // ── Section: Job Details ────────────────────────────────────────
             SectionHeader(title = "Job Details", icon = Icons.Default.Work)
 
-
-
-            // Role DropDown
             ExposedDropdownMenuBox(
                 expanded = roleExpanded,
-                onExpandedChange = {roleExpanded = it}
+                onExpandedChange = { roleExpanded = it }
             ) {
-               OutlinedTextField(
-                   value         = role,
-                   onValueChange = {},
-                   readOnly      = true,
-                   label         = { Text("Role") },
-                   placeholder   = { Text("Select Role") },
-                   leadingIcon   = {
-                       Icon(Icons.Default.Star, contentDescription = null)
-                   },
-                   trailingIcon  = {
-                       ExposedDropdownMenuDefaults.TrailingIcon(expanded = deptExpanded)
-                   },
-                   modifier      = Modifier
-                       .fillMaxWidth()
-                       .menuAnchor(),
-                   shape         = RoundedCornerShape(12.dp)
-               )
+                OutlinedTextField(
+                    value         = role,
+                    onValueChange = {},
+                    readOnly      = true,
+                    label         = { Text("Role *") },
+                    isError       = roleError,
+                    placeholder   = { Text("Select Role") },
+                    leadingIcon   = { Icon(Icons.Default.Star, contentDescription = null) },
+                    trailingIcon  = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = roleExpanded) },
+                    modifier      = Modifier.fillMaxWidth().menuAnchor(),
+                    shape         = RoundedCornerShape(12.dp)
+                )
                 ExposedDropdownMenu(
                     expanded         = roleExpanded,
                     onDismissRequest = { roleExpanded = false }
                 ) {
                     roleDrop.forEach { roles ->
                         DropdownMenuItem(
-                            text    = { Text(roles) },
+                            text    = { Text(roles.replaceFirstChar { it.uppercase() }) },
                             onClick = {
-                                role   = roles
+                                role = roles
+                                roleError = false
                                 roleExpanded = false
                             }
                         )
@@ -349,9 +303,6 @@ fun AddEmployeeScreen(navController: NavController, userDao: UserDao) {
                 }
             }
 
-
-
-            // Department Dropdown
             ExposedDropdownMenuBox(
                 expanded         = deptExpanded,
                 onExpandedChange = { deptExpanded = it }
@@ -362,15 +313,9 @@ fun AddEmployeeScreen(navController: NavController, userDao: UserDao) {
                     readOnly      = true,
                     label         = { Text("Department") },
                     placeholder   = { Text("Select department") },
-                    leadingIcon   = {
-                        Icon(Icons.Default.LocationOn, contentDescription = null)
-                    },
-                    trailingIcon  = {
-                        ExposedDropdownMenuDefaults.TrailingIcon(expanded = deptExpanded)
-                    },
-                    modifier      = Modifier
-                        .fillMaxWidth()
-                        .menuAnchor(),
+                    leadingIcon   = { Icon(Icons.Default.LocationOn, contentDescription = null) },
+                    trailingIcon  = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = deptExpanded) },
+                    modifier      = Modifier.fillMaxWidth().menuAnchor(),
                     shape         = RoundedCornerShape(12.dp)
                 )
                 ExposedDropdownMenu(
@@ -381,7 +326,7 @@ fun AddEmployeeScreen(navController: NavController, userDao: UserDao) {
                         DropdownMenuItem(
                             text    = { Text(dept) },
                             onClick = {
-                                department   = dept
+                                department = dept
                                 deptExpanded = false
                             }
                         )
@@ -392,301 +337,125 @@ fun AddEmployeeScreen(navController: NavController, userDao: UserDao) {
             FormField(
                 value           = shift,
                 onValueChange   = { shift = it },
-                label           = "shift",
-                placeholder     = "Night, Day",
-                leadingIcon     = Icons.Default.List,
+                label           = "Shift",
+                placeholder     = "e.g. Day, Night",
+                leadingIcon     = Icons.Default.Schedule,
                 keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words)
             )
 
             HorizontalDivider()
 
-            // ── Section: Generated Credentials ─────────────────────────────
             SectionHeader(title = "Generated Credentials", icon = Icons.Default.Lock)
 
-            // Employee ID field
             OutlinedTextField(
                 value         = employeeId,
                 onValueChange = {},
                 readOnly      = true,
                 label         = { Text("Employee ID") },
-                leadingIcon   = {
-                    Icon(Icons.Default.Person, contentDescription = null)
-                },
+                leadingIcon   = { Icon(Icons.Default.Badge, contentDescription = null) },
                 trailingIcon  = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        // Regenerate ID button
-
                         if (employeeId =="Generating..."){
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(18.dp),
-                                strokeWidth = 2.dp,
-                                color = MaterialTheme.colorScheme.primary
-                            )
+                            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
                         }
-
-
-                        IconButton(onClick = {
-                            idCopied   = false
-                        }) {
-                            Icon(
-                                imageVector        = Icons.Default.Refresh,
-                                contentDescription = "Regenerate ID",
-                                tint               = MaterialTheme.colorScheme.primary
-                            )
-                        }
-                        // Copy ID button
-                        IconButton(onClick = {
-                            clipboardManager.setText(AnnotatedString(employeeId))
-                            idCopied = true
-                        }) {
-                            Icon(
-                                imageVector        = if (idCopied) Icons.Default.Check else Icons.Default.Share,
-                                contentDescription = "Copy ID",
-                                tint               = if (idCopied) MaterialTheme.colorScheme.primary
-                                else MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                        IconButton(onClick = { clipboardManager.setText(AnnotatedString(employeeId)); idCopied = true }) {
+                            Icon(imageVector = if (idCopied) Icons.Default.Check else Icons.Default.ContentCopy, contentDescription = "Copy")
                         }
                     }
                 },
                 modifier = Modifier.fillMaxWidth(),
                 shape    = RoundedCornerShape(12.dp),
-                colors   = OutlinedTextFieldDefaults.colors(
-                    disabledTextColor        = MaterialTheme.colorScheme.onSurface,
-                    disabledBorderColor      = MaterialTheme.colorScheme.outline,
-                    disabledLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    disabledLabelColor       = MaterialTheme.colorScheme.onSurfaceVariant,
-                ),
-                textStyle = LocalTextStyle.current.copy(
-                    fontFamily = FontFamily.Monospace,
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize   = 15.sp
-                )
+                textStyle = LocalTextStyle.current.copy(fontFamily = FontFamily.Monospace, fontWeight = FontWeight.SemiBold)
             )
 
-            // Generated Password field
             OutlinedTextField(
                 value               = generatedPassword,
                 onValueChange       = {},
                 readOnly            = true,
                 label               = { Text("Generated Password") },
-                leadingIcon         = {
-                    Icon(Icons.Default.Lock, contentDescription = null)
-                },
+                leadingIcon         = { Icon(Icons.Default.Lock, contentDescription = null) },
                 trailingIcon        = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        // Toggle visibility
                         IconButton(onClick = { passwordVisible = !passwordVisible }) {
-                            Icon(
-                                imageVector        = if (passwordVisible) Icons.Default.VisibilityOff
-                                else Icons.Default.Visibility,
-                                contentDescription = "Toggle password visibility"
-                            )
+                            Icon(imageVector = if (passwordVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility, contentDescription = null)
                         }
-                        // Regenerate password
-                        IconButton(onClick = {
-                            generatedPassword = generatePassword()
-                            pwCopied          = false
-                        }) {
-                            Icon(
-                                imageVector        = Icons.Default.Refresh,
-                                contentDescription = "Regenerate password",
-                                tint               = MaterialTheme.colorScheme.primary
-                            )
-                        }
-                        // Copy password
-                        IconButton(onClick = {
-                            clipboardManager.setText(AnnotatedString(generatedPassword))
-                            pwCopied = true
-                        }) {
-                            Icon(
-                                imageVector        = if (pwCopied) Icons.Default.Check else Icons.Default.Share,
-                                contentDescription = "Copy password",
-                                tint               = if (pwCopied) MaterialTheme.colorScheme.primary
-                                else MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                        IconButton(onClick = { clipboardManager.setText(AnnotatedString(generatedPassword)); pwCopied = true }) {
+                            Icon(imageVector = if (pwCopied) Icons.Default.Check else Icons.Default.ContentCopy, contentDescription = "Copy")
                         }
                     }
                 },
-                visualTransformation = if (passwordVisible) VisualTransformation.None
-                else PasswordVisualTransformation(),
+                visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                 modifier  = Modifier.fillMaxWidth(),
                 shape     = RoundedCornerShape(12.dp),
-                textStyle = LocalTextStyle.current.copy(
-                    fontFamily = FontFamily.Monospace,
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize   = 15.sp
-                )
+                textStyle = LocalTextStyle.current.copy(fontFamily = FontFamily.Monospace, fontWeight = FontWeight.SemiBold)
             )
 
-            // Password strength hint
-            Surface(
-                color  = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
-                shape  = RoundedCornerShape(8.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Row(
-                    modifier          = Modifier.padding(12.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector        = Icons.Default.Info,
-                        contentDescription = null,
-                        tint               = MaterialTheme.colorScheme.primary,
-                        modifier           = Modifier.size(16.dp)
-                    )
-                    Text(
-                        text  = "Password includes uppercase, lowercase, numbers and special characters. Hit 🔄 to regenerate.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-
-            HorizontalDivider()
-
-            // ── Action Buttons ──────────────────────────────────────────────
             Button(
                 onClick = {
-                    // Validate
-                    nameError  = first_Name.isBlank()
-                    nameError = last_Name.isBlank()
-                    emailError = email.isBlank() || !email.contains("@")
-                    roleError  = role.isBlank()
+                    firstNameError = first_Name.isBlank()
+                    lastNameError  = last_Name.isBlank()
+                    emailError     = email.isBlank() || !email.contains("@")
+                    roleError      = role.isBlank()
 
-                    if (!nameError && !emailError && !roleError) {
+                    if (!firstNameError && !lastNameError && !emailError && !roleError) {
                         viewModel.addEmployee(
-                            employeeId,
-                            first_Name,
-                            last_Name,
-                            role,
-                            shift,
-                            email,
-                            phone,
-                            generatedPassword,
-                            department,
-                            onSuccess = {
-                                showSuccess = true
-                            },
-                            onError = {
-                                println("Error adding employee: \$errorMsg")
-                            }
+                            employeeId, first_Name, last_Name, role, shift, email, phone, generatedPassword, department,
+                            onSuccess = { showSuccess = true },
+                            onError = { /* Handle error */ }
                         )
                     }
-
                 },
                 modifier = Modifier.fillMaxWidth(),
                 shape    = RoundedCornerShape(12.dp),
                 contentPadding = PaddingValues(vertical = 14.dp)
             ) {
-                Icon(
-                    imageVector        = Icons.Default.Add,
-                    contentDescription = null,
-                    modifier           = Modifier.size(18.dp)
-                )
+                Icon(Icons.Default.PersonAdd, contentDescription = null)
                 Spacer(Modifier.width(8.dp))
-                Text(
-                    text       = "Add Employee",
-                    fontWeight = FontWeight.SemiBold
-                )
+                Text("Add Employee", fontWeight = FontWeight.SemiBold)
             }
 
             OutlinedButton(
                 onClick  = { navController.popBackStack() },
                 modifier = Modifier.fillMaxWidth(),
-                shape    = RoundedCornerShape(12.dp),
-                contentPadding = PaddingValues(vertical = 14.dp)
+                shape    = RoundedCornerShape(12.dp)
             ) {
                 Text("Cancel")
             }
-
-            Spacer(Modifier.height(8.dp))
         }
     }
 }
 
-// ─── Reusable Components ──────────────────────────────────────────────────────
-
 @Composable
 private fun SectionHeader(title: String, icon: ImageVector) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        Icon(
-            imageVector        = icon,
-            contentDescription = null,
-            tint               = MaterialTheme.colorScheme.primary,
-            modifier           = Modifier.size(20.dp)
-        )
-        Text(
-            text       = title,
-            style      = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
-            color      = MaterialTheme.colorScheme.primary
-        )
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+        Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
     }
 }
 
 @Composable
 private fun CredentialRow(label: String, value: String) {
-    Row(
-        modifier              = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment     = Alignment.CenterVertically
-    ) {
-        Text(
-            text  = label,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Text(
-            text       = value,
-            style      = MaterialTheme.typography.bodySmall,
-            fontFamily = FontFamily.Monospace,
-            fontWeight = FontWeight.Bold,
-            color      = MaterialTheme.colorScheme.primary
-        )
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+        Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(value, style = MaterialTheme.typography.bodySmall, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
     }
 }
+
 @Composable
 private fun FormField(
-    value:           String,
-    onValueChange:   (String) -> Unit,
-    label:           String,
-    placeholder:     String          = "",
-    isError:         Boolean         = false,
-    errorMessage:    String          = "",
-    leadingIcon:     ImageVector?    = null,
+    value: String, onValueChange: (String) -> Unit, label: String, placeholder: String = "",
+    isError: Boolean = false, errorMessage: String = "", leadingIcon: ImageVector? = null,
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         OutlinedTextField(
-            value           = value,
-            onValueChange   = onValueChange,
-            modifier        = Modifier.fillMaxWidth(),
-            label           = { Text(label) },
-            placeholder     = { Text(placeholder) },
-            isError         = isError,
-            leadingIcon     = leadingIcon?.let {
-                { Icon(it, contentDescription = null) }
-            },
-            keyboardOptions = keyboardOptions,
-            shape           = RoundedCornerShape(12.dp),
-            singleLine      = true
+            value = value, onValueChange = onValueChange, modifier = Modifier.fillMaxWidth(),
+            label = { Text(label) }, placeholder = { Text(placeholder) }, isError = isError,
+            leadingIcon = leadingIcon?.let { { Icon(it, contentDescription = null) } },
+            keyboardOptions = keyboardOptions, shape = RoundedCornerShape(12.dp), singleLine = true
         )
-        if (isError && errorMessage.isNotEmpty()) {
-            Text(
-                text  = errorMessage,
-                color = MaterialTheme.colorScheme.error,
-                style = MaterialTheme.typography.labelSmall,
-                modifier = Modifier.padding(start = 4.dp)
-            )
+        if (isError) {
+            Text(errorMessage, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall)
         }
     }
 }
-
-
-// Preview
-
-

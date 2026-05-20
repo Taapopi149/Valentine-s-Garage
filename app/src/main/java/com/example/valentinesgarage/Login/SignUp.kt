@@ -6,7 +6,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -140,7 +140,7 @@ fun SignUp(navController: NavController, userDao: UserDao) {
                 title = {},
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
@@ -317,6 +317,25 @@ fun SignUp(navController: NavController, userDao: UserDao) {
                     fontSize   = 15.sp,
                     fontWeight = FontWeight.Medium
                 )
+            }
+
+            // Developer bypass buttons
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                TextButton(
+                    onClick = { navController.navigate("ManagerHome") },
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text("Skip to Manager")
+                }
+                TextButton(
+                    onClick = { navController.navigate("EmployeePage") },
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text("Skip to Employee")
+                }
             }
 
             Row(

@@ -16,7 +16,6 @@ import com.example.valentinesgarage.Screens.CheckIn.TruckCheckInScreen
 import com.example.valentinesgarage.Screens.Employee.EmployeeHomePage
 import com.example.valentinesgarage.Screens.Employee.EmployeeProfilePage
 import com.example.valentinesgarage.Screens.Manager.AddEmployeeScreen
-// import com.example.valentinesgarage.Screens.Manager.ReportsScreen
 import com.example.valentinesgarage.Screens.Mechanic.MechanicTaskBoardScreen
 import com.example.valentinesgarage.Screens.Mechanic.MechanicVehiclePickerScreen
 import com.example.valentinesgarage.Screens.Mechanic.MechanicViewModel
@@ -24,67 +23,73 @@ import com.example.valentinesgarage.Screens.Vehicles.ActiveVehiclesScreen
 import com.example.valentinesgarage.Screens.Vehicles.ActiveVehiclesViewModel
 import com.example.valentinesgarage.Screens.Vehicles.TruckDetailScreen
 
-
+/**
+ * Root navigation component of the application.
+ * Defines all routes and handles transitions between screens.
+ */
 @Composable
-fun AppNavigation(mechanicViewModel: MechanicViewModel,
-                  activeVehiclesViewModel: ActiveVehiclesViewModel,
-                  checkInViewModel: CheckInViewModel,
-                  userDao: UserDao) {
-
+fun AppNavigation(
+    mechanicViewModel: MechanicViewModel,
+    activeVehiclesViewModel: ActiveVehiclesViewModel,
+    checkInViewModel: CheckInViewModel,
+    userDao: UserDao
+) {
     val navController = rememberNavController()
-
-
 
     NavHost(navController = navController, startDestination = "SignUp") {
 
+        // Authentication Flow
         composable("SignUp") {
             SignUp(navController, userDao)
         }
 
         composable("Login") {
-            Login(navController, userDao) }
+            Login(navController, userDao)
+        }
 
-       // composable("reports") {ReportsScreen(navController)}
+        // Employee & Receptionist Dashboard
+        composable("EmployeePage") { 
+            EmployeeHomePage(navController) 
+        }
 
-        composable("EmployeePage") { EmployeeHomePage(navController) }
-        composable ("MechanicTaskList"){ MechanicVehiclePickerScreen(navController, mechanicViewModel) }
-        composable ("ActiveVehicle"){ ActiveVehiclesScreen(navController, activeVehiclesViewModel) }
-        composable ("TruckCheckIn"){ TruckCheckInScreen(navController,checkInViewModel ) }
-        composable ("ManagerHome"){ManagerDashboardScreen(navController) }
+        // Service & Maintenance Flow
+        composable("MechanicTaskList") { 
+            MechanicVehiclePickerScreen(navController, mechanicViewModel) 
+        }
+        
+        composable("ActiveVehicle") { 
+            ActiveVehiclesScreen(navController, activeVehiclesViewModel) 
+        }
+        
+        composable("TruckCheckIn") { 
+            TruckCheckInScreen(navController, checkInViewModel) 
+        }
 
-        composable("addEmployee"){AddEmployeeScreen(navController, userDao)}
+        // Manager Flow
+        composable("ManagerHome") {
+            ManagerDashboardScreen(navController, userDao) 
+        }
 
-        composable(
-            route = "taskBoard/{jobId}"
-        ) { backStackEntry ->
+        composable("addEmployee") {
+            AddEmployeeScreen(navController, userDao)
+        }
 
+        // Detailed View Routes
+        composable(route = "taskBoard/{jobId}") { backStackEntry ->
             val jobId = backStackEntry.arguments?.getString("jobId") ?: ""
-
-            MechanicTaskBoardScreen(
-                navController = navController,
-                jobId = jobId
-            )
+            MechanicTaskBoardScreen(navController = navController, jobId = jobId)
         }
 
         composable(
             route = "truckDetail/{truckId}",
-            arguments = listOf(
-                navArgument("truckId") { type = NavType.StringType }
-            )
+            arguments = listOf(navArgument("truckId") { type = NavType.StringType })
         ) { backStackEntry ->
-
             val truckId = backStackEntry.arguments?.getString("truckId")
-
-            TruckDetailScreen(
-                navController = navController,
-                truckId = truckId// you can rename later to truckId
-            )
+            TruckDetailScreen(navController = navController, truckId = truckId)
         }
 
-        composable ("Profile"){ EmployeeProfilePage(navController) }
-      //  composable("Report") { ReportsScreen(navController) }
-
+        composable("Profile") { 
+            EmployeeProfilePage(navController) 
+        }
     }
-
-
 }

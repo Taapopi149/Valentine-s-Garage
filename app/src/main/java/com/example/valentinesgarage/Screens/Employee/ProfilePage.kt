@@ -223,7 +223,12 @@ fun EmployeeProfilePage(navController: NavController) {
             item {
                 Spacer(modifier = Modifier.height(4.dp))
                 OutlinedButton(
-                    onClick = { /* TODO: sign out */ },
+                    onClick = {
+                        // Log out logic: Navigate to Login and clear backstack
+                        navController.navigate("Login") {
+                            popUpTo(0) { inclusive = true }
+                        }
+                    },
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp)

@@ -403,14 +403,22 @@ private fun EditProfileSheet(
 
 @Composable
 private fun StatChip(modifier: Modifier = Modifier, value: String, label: String, color: Color) {
-    Card(modifier = modifier, shape = RoundedCornerShape(12.dp), colors = CardDefaults.cardColors(containerColor = Color.White), elevation = CardDefaults.cardElevation(2.dp)) {
-        Column(Modifier.fillMaxWidth().padding(vertical = 14.dp), Alignment.CenterHorizontally, Arrangement.spacedBy(4.dp)) {
+    Card(
+        modifier = modifier,
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(2.dp)
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(vertical = 14.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
             Text(value, fontSize = 22.sp, fontWeight = FontWeight.Bold, color = color)
             Text(label, fontSize = 11.sp, color = SubtleGray, fontWeight = FontWeight.Medium, textAlign = TextAlign.Center)
         }
     }
 }
-
 @Composable
 private fun ProfileSection(title: String, content: @Composable ColumnScope.() -> Unit) {
     Column(Modifier.padding(horizontal = 16.dp), Arrangement.spacedBy(0.dp)) {
@@ -423,7 +431,11 @@ private fun ProfileSection(title: String, content: @Composable ColumnScope.() ->
 
 @Composable
 private fun InfoRow(icon: ImageVector, label: String, value: String) {
-    Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp), Alignment.CenterVertically, Arrangement.spacedBy(14.dp)) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
         Box(Modifier.size(36.dp).clip(RoundedCornerShape(9.dp)).background(Color(0xFFF0F0F2)), Alignment.Center) {
             Icon(icon, null, tint = DarkInk, modifier = Modifier.size(18.dp))
         }

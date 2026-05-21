@@ -1,7 +1,6 @@
 package com.example.valentinesgarage.Screens.Vehicles
 
 import android.net.Uri
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -30,7 +29,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
-import androidx.navigation.compose.rememberNavController
 import coil.compose.rememberAsyncImagePainter
 import com.example.valentinesgarage.Data.DAO.NotesDao
 import com.example.valentinesgarage.Data.DAO.TasksDao
@@ -80,8 +78,7 @@ class TruckDetailViewModel(
 
     private fun load() {
         viewModelScope.launch {
-            // Combine truck row + its tasks into one flow so both
-            // update the UI whenever either changes
+
             combine(
                 truckDao.getTruckById(truckId).filterNotNull(),
                 tasksDao.getTasksForTruck(truckId)
